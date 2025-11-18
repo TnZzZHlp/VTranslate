@@ -1,2 +1,9 @@
-// @ts-ignore isolatedModules
-console.log("hello world");
+console.log("[VTranslate] started.");
+
+import { config } from "./services/config.js";
+import { addButton } from "./panel.js";
+
+// 示例：读取配置
+console.log("Current API Key:", config.apiKey);
+
+addButton();

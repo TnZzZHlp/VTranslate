@@ -9,7 +9,10 @@ export default defineConfig({
             userscript: {
                 icon: "https://vitejs.dev/logo.svg",
                 namespace: "npm/vite-plugin-monkey",
-                match: ["https://bbs.yamibo.com/thread-*"],
+                match: [
+                    "https://bbs.yamibo.com/thread-*",
+                    "https://bbs.yamibo.com/forum.php*",
+                ],
             },
         }),
     ],
