@@ -1,5 +1,6 @@
 import { fetchTranslation } from "./trasnlate";
 import { createFloatingButton } from "./ui";
+import { TranslationResult } from "./ai";
 
 interface ReaderImage {
     src: string;
@@ -41,7 +42,7 @@ function extractImages(): ReaderImage[] {
 }
 
 /**
- * Shows the Reader Mode UI (Split Screen).
+ * Shows the Reader Mode UI (Split Screen with Overlay Translations).
  */
 export function showReaderMode() {
     if (document.getElementById("vtranslate-reader")) return;
@@ -53,7 +54,7 @@ export function showReaderMode() {
     }
 
     let currentIndex = 0;
-    const translationCache = new Map<string, string>();
+    const translationCache = new Map<string, TranslationResult>();
 
     // --- UI Construction ---
 
@@ -70,36 +71,47 @@ export function showReaderMode() {
     overlay.style.display = "flex";
     overlay.style.flexDirection = "row";
 
-    // Left Panel (Image)
-    const leftPanel = document.createElement("div");
-    leftPanel.style.flex = "1";
-    leftPanel.style.height = "100%";
-    leftPanel.style.display = "flex";
-    leftPanel.style.justifyContent = "center";
-    leftPanel.style.alignItems = "center";
-    leftPanel.style.position = "relative";
-    leftPanel.style.backgroundColor = "#000";
+    // Image Container (centered)
+    const imageContainer = document.createElement("div");
+    imageContainer.style.flex = "1";
+    imageContainer.style.height = "100%";
+    imageContainer.style.display = "flex";
+    imageContainer.style.justifyContent = "center";
+    imageContainer.style.alignItems = "center";
+    imageContainer.style.position = "relative";
+    imageContainer.style.backgroundColor = "#000";
 
     const mainImage = document.createElement("img");
     mainImage.style.maxHeight = "100%";
     mainImage.style.maxWidth = "100%";
     mainImage.style.objectFit = "contain";
-    leftPanel.appendChild(mainImage);
+    mainImage.style.display = "block";
+    imageContainer.appendChild(mainImage);
 
-    // Navigation Buttons (Overlay on Left Panel)
+    // Overlay container for translations (positioned over the image)
+    const translationOverlay = document.createElement("div");
+    translationOverlay.style.position = "absolute";
+    translationOverlay.style.top = "0";
+    translationOverlay.style.left = "0";
+    translationOverlay.style.width = "100%";
+    translationOverlay.style.height = "100%";
+    translationOverlay.style.pointerEvents = "none";
+    imageContainer.appendChild(translationOverlay);
+
+    // Navigation Buttons
     const createNavButton = (text: string, right: boolean) => {
         const btn = document.createElement("button");
         btn.innerText = text;
         btn.style.position = "absolute";
         btn.style.top = "50%";
         btn.style.transform = "translateY(-50%)";
-        btn.style.backgroundColor = "rgba(0,0,0,0.5)";
+        btn.style.backgroundColor = "rgba(0,0,0,0.7)";
         btn.style.color = "#fff";
         btn.style.border = "none";
         btn.style.padding = "20px 10px";
         btn.style.cursor = "pointer";
         btn.style.fontSize = "24px";
-        btn.style.zIndex = "10";
+        btn.style.zIndex = "100";
         if (right) btn.style.right = "10px";
         else btn.style.left = "10px";
         return btn;
@@ -107,76 +119,45 @@ export function showReaderMode() {
 
     const prevBtn = createNavButton("❮", false);
     const nextBtn = createNavButton("❯", true);
-    leftPanel.appendChild(prevBtn);
-    leftPanel.appendChild(nextBtn);
+    imageContainer.appendChild(prevBtn);
+    imageContainer.appendChild(nextBtn);
 
-    // Right Panel (Translation)
-    const rightPanel = document.createElement("div");
-    rightPanel.style.width = "400px";
-    rightPanel.style.height = "100%";
-    rightPanel.style.backgroundColor = "#1e1e1e";
-    rightPanel.style.borderLeft = "1px solid #333";
-    rightPanel.style.display = "flex";
-    rightPanel.style.flexDirection = "column";
-    rightPanel.style.boxSizing = "border-box";
+    // Control Panel (bottom overlay)
+    const controlPanel = document.createElement("div");
+    controlPanel.style.position = "absolute";
+    controlPanel.style.bottom = "20px";
+    controlPanel.style.left = "50%";
+    controlPanel.style.transform = "translateX(-50%)";
+    controlPanel.style.display = "flex";
+    controlPanel.style.gap = "10px";
+    controlPanel.style.zIndex = "100";
 
-    // Right Panel Header
-    const header = document.createElement("div");
-    header.style.padding = "15px";
-    header.style.borderBottom = "1px solid #333";
-    header.style.display = "flex";
-    header.style.justifyContent = "space-between";
-    header.style.alignItems = "center";
-
-    const title = document.createElement("span");
-    title.innerText = "Translation";
-    title.style.color = "#fff";
-    title.style.fontWeight = "bold";
-    header.appendChild(title);
-
-    const closeBtn = document.createElement("button");
-    closeBtn.innerText = "✕";
-    closeBtn.style.background = "none";
-    closeBtn.style.border = "none";
-    closeBtn.style.color = "#aaa";
-    closeBtn.style.fontSize = "18px";
-    closeBtn.style.cursor = "pointer";
-    closeBtn.onclick = () => document.body.removeChild(overlay);
-    header.appendChild(closeBtn);
-    rightPanel.appendChild(header);
-
-    // Right Panel Content
-    const contentArea = document.createElement("div");
-    contentArea.style.flex = "1";
-    contentArea.style.padding = "20px";
-    contentArea.style.overflowY = "auto";
-    contentArea.style.color = "#ddd";
-    contentArea.style.fontSize = "16px";
-    contentArea.style.lineHeight = "1.6";
-    contentArea.style.whiteSpace = "pre-wrap";
-    contentArea.innerText = "Click 'Translate' to view content.";
-    rightPanel.appendChild(contentArea);
-
-    // Right Panel Footer (Translate Button)
-    const footer = document.createElement("div");
-    footer.style.padding = "20px";
-    footer.style.borderTop = "1px solid #333";
-    
     const translateBtn = document.createElement("button");
-    translateBtn.innerText = "Translate Current Image";
-    translateBtn.style.width = "100%";
-    translateBtn.style.padding = "12px";
+    translateBtn.innerText = "Translate";
+    translateBtn.style.padding = "12px 24px";
     translateBtn.style.backgroundColor = "#4CAF50";
     translateBtn.style.color = "white";
     translateBtn.style.border = "none";
     translateBtn.style.borderRadius = "4px";
     translateBtn.style.cursor = "pointer";
     translateBtn.style.fontSize = "16px";
-    footer.appendChild(translateBtn);
-    rightPanel.appendChild(footer);
+    translateBtn.style.fontWeight = "bold";
+    controlPanel.appendChild(translateBtn);
 
-    overlay.appendChild(leftPanel);
-    overlay.appendChild(rightPanel);
+    const closeBtn = document.createElement("button");
+    closeBtn.innerText = "Close";
+    closeBtn.style.padding = "12px 24px";
+    closeBtn.style.backgroundColor = "#f44336";
+    closeBtn.style.color = "white";
+    closeBtn.style.border = "none";
+    closeBtn.style.borderRadius = "4px";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.fontSize = "16px";
+    closeBtn.style.fontWeight = "bold";
+    controlPanel.appendChild(closeBtn);
+
+    imageContainer.appendChild(controlPanel);
+    overlay.appendChild(imageContainer);
     document.body.appendChild(overlay);
 
     // --- Logic ---
@@ -189,16 +170,52 @@ export function showReaderMode() {
         prevBtn.style.display = currentIndex > 0 ? "block" : "none";
         nextBtn.style.display = currentIndex < images.length - 1 ? "block" : "none";
 
-        // Update translation content
+        // Clear translation overlays
+        translationOverlay.innerHTML = "";
+
+        // Update translate button
         if (translationCache.has(imgData.src)) {
-            contentArea.innerText = translationCache.get(imgData.src)!;
-            translateBtn.disabled = true;
+            renderTranslationOverlays(translationCache.get(imgData.src)!);
             translateBtn.innerText = "Translated";
+            translateBtn.style.backgroundColor = "#888";
         } else {
-            contentArea.innerText = "Click 'Translate' to view content.";
+            translateBtn.innerText = "Translate";
+            translateBtn.style.backgroundColor = "#4CAF50";
             translateBtn.disabled = false;
-            translateBtn.innerText = "Translate Current Image";
         }
+    };
+
+    const renderTranslationOverlays = (result: TranslationResult) => {
+        translationOverlay.innerHTML = "";
+
+        result.blocks.forEach((block) => {
+            const textBlock = document.createElement("div");
+            textBlock.innerText = block.text;
+            textBlock.style.position = "absolute";
+            textBlock.style.top = `${block.y}%`;
+            
+            // Position based on side
+            if (block.side === "left") {
+                textBlock.style.left = "5%";
+                textBlock.style.textAlign = "left";
+            } else {
+                textBlock.style.right = "5%";
+                textBlock.style.textAlign = "right";
+            }
+
+            textBlock.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+            textBlock.style.color = "#fff";
+            textBlock.style.padding = "8px 12px";
+            textBlock.style.borderRadius = "4px";
+            textBlock.style.fontSize = "16px";
+            textBlock.style.lineHeight = "1.5";
+            textBlock.style.maxWidth = "40%";
+            textBlock.style.pointerEvents = "auto";
+            textBlock.style.boxShadow = "0 2px 8px rgba(0,0,0,0.5)";
+            textBlock.style.transform = "translateY(-50%)"; // Center on y position
+
+            translationOverlay.appendChild(textBlock);
+        });
     };
 
     const doTranslate = async () => {
@@ -207,34 +224,20 @@ export function showReaderMode() {
 
         translateBtn.disabled = true;
         translateBtn.innerText = "Translating...";
-        contentArea.innerText = "Translating...";
+        translateBtn.style.backgroundColor = "#888";
 
         try {
-            // We need to pass an HTMLImageElement to fetchTranslation.
-            // We can use the original element or the one in the reader.
-            // Using the one in the reader ensures we are translating what the user sees,
-            // but fetchTranslation might need the 'file' attribute which is on the original.
-            // Actually fetchTranslation checks getAttribute("file").
-            // Our extractImages preserved the original element.
+            const result = await fetchTranslation(imgData.originalElement);
             
-            // Let's use the original element to be safe about attributes, 
-            // OR we can just use the mainImage if we copy attributes?
-            // The safest is to use the logic in fetchTranslation which handles 'file' attr.
-            // Since we already resolved the 'src' in extractImages (prioritizing file),
-            // we can just pass a new Image with that src, or the original element.
-            
-            // Issue: fetchTranslation calls imageToBase64 which checks getAttribute("file").
-            // If we pass the original element, it works.
-            const text = await fetchTranslation(imgData.originalElement);
-            
-            translationCache.set(imgData.src, text);
-            contentArea.innerText = text;
+            translationCache.set(imgData.src, result);
+            renderTranslationOverlays(result);
             translateBtn.innerText = "Translated";
         } catch (e) {
             console.error(e);
-            contentArea.innerText = "Translation failed. See console.";
+            alert("Translation failed. See console.");
             translateBtn.disabled = false;
-            translateBtn.innerText = "Retry Translate";
+            translateBtn.innerText = "Retry";
+            translateBtn.style.backgroundColor = "#f44336";
         }
     };
 
@@ -263,10 +266,6 @@ export function showReaderMode() {
     window.addEventListener("keydown", handleKeydown);
 
     // Cleanup on close
-    const originalRemove = overlay.remove.bind(overlay); // or just use the closeBtn handler
-    // We need to remove the event listener when overlay is removed.
-    // Since we used document.body.removeChild(overlay), we can hook into that or just make a cleanup function.
-    
     closeBtn.onclick = () => {
         window.removeEventListener("keydown", handleKeydown);
         document.body.removeChild(overlay);

@@ -1,28 +1,29 @@
-import { translateImage } from "./ai";
+import { translateImage, TranslationResult } from "./ai";
 import { showTranslationModal } from "./ui";
 
 /**
  * Fetches the translation for an image.
  * @param img The image element to translate.
- * @returns The translated text.
+ * @returns The translation result with positioned blocks.
  */
-export async function fetchTranslation(img: HTMLImageElement): Promise<string> {
+export async function fetchTranslation(img: HTMLImageElement): Promise<TranslationResult> {
     console.debug("[Translate] Starting translation for image.", img);
     // 1. Convert image to Base64
     const base64 = await imageToBase64(img);
     console.debug("[Translate] Image converted to base64, length:", base64.length);
 
     // 2. Call AI Service
-    const translatedText = await translateImage(base64);
-    console.log("[Translate] Result:", translatedText);
-    return translatedText;
+    const translationResult = await translateImage(base64);
+    console.log("[Translate] Result:", translationResult);
+    return translationResult;
 }
 
 export async function translateText(img: HTMLImageElement) {
     try {
-        const translatedText = await fetchTranslation(img);
-        // 3. Display result
-        showTranslationModal(img, translatedText);
+        const result = await fetchTranslation(img);
+        // 3. Display result - convert blocks to text for modal
+        const text = result.blocks.map(b => b.text).join("\n\n");
+        showTranslationModal(img, text);
     } catch (error) {
         console.error("[Translate] Error during translation:", error);
         alert("Translation failed. Check console for details.");
