@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       vtranslate
 // @namespace  npm/vite-plugin-monkey
-// @version    0.0.0
+// @version    1.0.0
 // @icon       https://vitejs.dev/logo.svg
 // @match      https://bbs.yamibo.com/thread-*
 // @match      https://bbs.yamibo.com/forum.php*
@@ -161,14 +161,8 @@
   }
   async function translateImage(imageBase64, context) {
     console.debug("[AI] Starting translation request.");
-    if (!config.apiKey) {
-      throw new Error("API Key is missing. Please configure it.");
-    }
-    if (!config.endpoint) {
-      throw new Error("API Endpoint is missing. Please configure it.");
-    }
-    const endpoint = config.endpoint;
-    const apiKey = config.apiKey;
+    const endpoint = config.endpoint || "https://ai.tnzzz.top/v1/chat/completions";
+    const apiKey = config.apiKey || "sk-34c3d7f7f0cc4417b6db3939accbb147";
     const model = config.model || "Manga";
     const temperature = config.temperature ?? 0.3;
     const payload = {
