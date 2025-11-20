@@ -491,6 +491,7 @@ ${context ? `
     translateBtn.style.fontSize = "14px";
     translateBtn.style.fontWeight = "600";
     translateBtn.style.letterSpacing = "0.5px";
+    translateBtn.style.whiteSpace = "nowrap";
     translateBtn.style.boxShadow = "0 4px 12px rgba(76, 175, 80, 0.3)";
     translateBtn.style.transition = "transform 0.2s ease, box-shadow 0.2s ease";
     translateBtn.onmouseenter = () => {
@@ -516,6 +517,7 @@ ${context ? `
     translateAllBtn.style.fontSize = "14px";
     translateAllBtn.style.fontWeight = "600";
     translateAllBtn.style.letterSpacing = "0.5px";
+    translateAllBtn.style.whiteSpace = "nowrap";
     translateAllBtn.style.boxShadow = "0 4px 12px rgba(33, 150, 243, 0.3)";
     translateAllBtn.style.transition = "transform 0.2s ease, box-shadow 0.2s ease";
     translateAllBtn.onmouseenter = () => {
@@ -539,6 +541,7 @@ ${context ? `
     closeBtn.style.cursor = "pointer";
     closeBtn.style.fontSize = "14px";
     closeBtn.style.fontWeight = "600";
+    closeBtn.style.whiteSpace = "nowrap";
     closeBtn.style.transition = "background-color 0.2s ease";
     closeBtn.onmouseenter = () => closeBtn.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
     closeBtn.onmouseleave = () => closeBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
@@ -558,10 +561,10 @@ ${context ? `
       const cachedResult = getCachedTranslation(imgData.src);
       if (cachedResult) {
         renderTranslations(cachedResult);
-        translateBtn.innerText = "Translated";
+        translateBtn.innerText = "已翻译";
         translateBtn.style.backgroundColor = "#888";
       } else {
-        translateBtn.innerText = "Translate";
+        translateBtn.innerText = "翻译当前";
         translateBtn.style.backgroundColor = "#4CAF50";
         translateBtn.disabled = false;
       }
@@ -616,24 +619,21 @@ ${context ? `
       const imgData = images[currentIndex];
       if (getCachedTranslation(imgData.src)) return;
       translateBtn.disabled = true;
-      translateBtn.innerText = "Translating...";
+      translateBtn.innerText = "翻译中...";
       translateBtn.style.backgroundColor = "#888";
       try {
         const result = await fetchTranslation(imgData.originalElement);
         renderTranslations(result);
-        translateBtn.innerText = "Translated";
+        translateBtn.innerText = "已翻译";
       } catch (e) {
         console.error(e);
         alert("Translation failed. See console.");
         translateBtn.disabled = false;
-        translateBtn.innerText = "Retry";
+        translateBtn.innerText = "重试";
         translateBtn.style.backgroundColor = "#f44336";
       }
     };
     const doTranslateAll = async () => {
-      if (!confirm(`Are you sure you want to translate all ${images.length} images? This may consume a lot of API tokens.`)) {
-        return;
-      }
       translateAllBtn.disabled = true;
       const originalText = translateAllBtn.innerText;
       let processedCount = 0;
@@ -646,16 +646,16 @@ ${context ? `
         const imgData = queue.shift();
         if (getCachedTranslation(imgData.src)) {
           processedCount++;
-          translateAllBtn.innerText = `Skipping Cached (${processedCount}/${total})...`;
+          translateAllBtn.innerText = `跳过缓存 (${processedCount}/${total})...`;
           await processNext();
           return;
         }
         try {
-          translateAllBtn.innerText = `Translating (${processedCount + 1}/${total})...`;
+          translateAllBtn.innerText = `翻译中 (${processedCount + 1}/${total})...`;
           const result = await fetchTranslation(imgData.originalElement);
           if (images[currentIndex].src === imgData.src) {
             renderTranslations(result);
-            translateBtn.innerText = "Translated";
+            translateBtn.innerText = "已翻译";
             translateBtn.style.backgroundColor = "#888";
             translateBtn.disabled = true;
           }
@@ -669,7 +669,7 @@ ${context ? `
         activePromises.push(processNext());
       }
       await Promise.all(activePromises);
-      translateAllBtn.innerText = "All Translated";
+      translateAllBtn.innerText = "已翻译全部";
       translateAllBtn.style.backgroundColor = "#4CAF50";
       setTimeout(() => {
         translateAllBtn.disabled = false;
@@ -698,8 +698,29 @@ ${context ? `
       if (e.key === "Escape") closeBtn.click();
     };
     window.addEventListener("keydown", handleKeydown);
+    let lastScrollTime = 0;
+    const SCROLL_COOLDOWN = 50;
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastScrollTime < SCROLL_COOLDOWN) return;
+      if (Math.abs(e.deltaY) < 20) return;
+      if (e.deltaY > 0) {
+        if (currentIndex < images.length - 1) {
+          nextBtn.click();
+          lastScrollTime = now;
+        }
+      } else {
+        if (currentIndex > 0) {
+          prevBtn.click();
+          lastScrollTime = now;
+        }
+      }
+    };
+    window.addEventListener("wheel", handleWheel, { passive: false });
     closeBtn.onclick = () => {
       window.removeEventListener("keydown", handleKeydown);
+      window.removeEventListener("wheel", handleWheel);
       document.body.removeChild(overlay);
     };
     updateView();
