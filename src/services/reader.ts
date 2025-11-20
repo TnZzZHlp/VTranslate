@@ -339,35 +339,59 @@ export function showReaderMode() {
         rightContainer.style.width = "100%";
         rightContainer.style.height = "100%";
 
-        result.blocks.forEach((block) => {
-            const textBlock = document.createElement("div");
-            textBlock.innerText = block.text;
-            textBlock.style.position = "absolute";
-            textBlock.style.top = `${block.y}%`;
-            textBlock.style.transform = "translateY(-50%)";
-            textBlock.style.width = "90%";
-            textBlock.style.left = "5%";
-            
-            textBlock.style.backgroundColor = "rgba(30, 30, 30, 0.9)";
-            textBlock.style.color = "#fff";
-            textBlock.style.padding = "10px 12px";
-            textBlock.style.borderRadius = "4px";
-            textBlock.style.fontSize = "15px";
-            textBlock.style.lineHeight = "1.6";
-            textBlock.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
-            textBlock.style.border = "1px solid #444";
-
-            if (block.side === "left") {
-                textBlock.style.textAlign = "right";
-                leftContainer.appendChild(textBlock);
-            } else {
-                textBlock.style.textAlign = "left";
-                rightContainer.appendChild(textBlock);
-            }
-        });
-
         leftPanel.appendChild(leftContainer);
         rightPanel.appendChild(rightContainer);
+
+        // Helper to render blocks for one side with collision detection
+        const renderSide = (container: HTMLElement, blocks: typeof result.blocks, align: "left" | "right") => {
+            // Sort by Y position to process from top to bottom
+            blocks.sort((a, b) => a.y - b.y);
+
+            let lastBottom = 0;
+            const containerHeight = container.clientHeight || window.innerHeight; // Fallback if not yet rendered
+
+            blocks.forEach((block) => {
+                const textBlock = document.createElement("div");
+                textBlock.innerText = block.text;
+                textBlock.style.position = "absolute";
+                textBlock.style.width = "90%";
+                textBlock.style.left = "5%";
+                
+                textBlock.style.backgroundColor = "rgba(30, 30, 30, 0.9)";
+                textBlock.style.color = "#fff";
+                textBlock.style.padding = "10px 12px";
+                textBlock.style.borderRadius = "4px";
+                textBlock.style.fontSize = "15px";
+                textBlock.style.lineHeight = "1.6";
+                textBlock.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
+                textBlock.style.border = "1px solid #444";
+                textBlock.style.textAlign = align;
+
+                // Calculate ideal top in pixels
+                let topPx = (block.y / 100) * containerHeight;
+
+                // Collision detection: ensure we don't overlap with the previous block
+                // Add a 10px gap
+                if (topPx < lastBottom + 10) {
+                    topPx = lastBottom + 10;
+                }
+
+                textBlock.style.top = `${topPx}px`;
+                
+                // We need to append first to get the height
+                container.appendChild(textBlock);
+
+                // Update lastBottom for the next block
+                lastBottom = topPx + textBlock.offsetHeight;
+            });
+        };
+
+        // Split blocks by side
+        const leftBlocks = result.blocks.filter(b => b.side === "left");
+        const rightBlocks = result.blocks.filter(b => b.side !== "left"); // Default to right if not left
+
+        renderSide(leftContainer, leftBlocks, "right");
+        renderSide(rightContainer, rightBlocks, "left");
     };
 
     const doTranslate = async () => {
