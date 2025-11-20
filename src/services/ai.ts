@@ -13,9 +13,10 @@ export interface TranslationResult {
 /**
  * Translates an image using an AI service.
  * @param imageBase64 Base64-encoded image (data URL format).
+ * @param context Optional context information (e.g., page title) to help with translation.
  * @returns Translation result with positioned blocks.
  */
-export async function translateImage(imageBase64: string): Promise<TranslationResult> {
+export async function translateImage(imageBase64: string, context?: string): Promise<TranslationResult> {
     console.debug("[AI] Starting translation request.");
 
     // Validate configuration
@@ -41,7 +42,7 @@ export async function translateImage(imageBase64: string): Promise<TranslationRe
                     {
                         type: "text",
                         text: `请将图片中的所有文本翻译成简体中文。
-
+${context ? `\n上下文信息：${context}\n请参考这个上下文来帮助理解和翻译图片内容。\n` : ''}
 返回格式必须是JSON，格式如下：
 {
   "blocks": [

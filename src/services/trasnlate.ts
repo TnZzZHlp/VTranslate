@@ -1,5 +1,42 @@
+import { GM_getValue, GM_setValue } from "$";
 import { translateImage, TranslationResult } from "./ai";
 import { showTranslationModal } from "./ui";
+
+const CACHE_KEY = "vtranslate_cache_v1";
+
+function getCache(): Record<string, TranslationResult> {
+    return GM_getValue(CACHE_KEY, {});
+}
+
+function setCache(cache: Record<string, TranslationResult>) {
+    GM_setValue(CACHE_KEY, cache);
+}
+
+export function getCachedTranslation(src: string): TranslationResult | undefined {
+    const cache = getCache();
+    return cache[src];
+}
+
+export function saveTranslationToCache(src: string, result: TranslationResult) {
+    const cache = getCache();
+    cache[src] = result;
+    setCache(cache);
+}
+
+/**
+ * Gets the page title as context from thread_subject element.
+ */
+function getPageContext(): string | undefined {
+    const titleElement = document.getElementById("thread_subject");
+    if (titleElement) {
+        const title = titleElement.textContent?.trim();
+        if (title) {
+            console.debug("[Translate] Found context title:", title);
+            return title;
+        }
+    }
+    return undefined;
+}
 
 /**
  * Fetches the translation for an image.
@@ -7,14 +44,31 @@ import { showTranslationModal } from "./ui";
  * @returns The translation result with positioned blocks.
  */
 export async function fetchTranslation(img: HTMLImageElement): Promise<TranslationResult> {
+    const src = img.getAttribute("file") || img.src;
+    
+    // Check cache first
+    const cached = getCachedTranslation(src);
+    if (cached) {
+        console.debug("[Translate] Cache hit for:", src);
+        return cached;
+    }
+
     console.debug("[Translate] Starting translation for image.", img);
+    
+    // Get page context (title)
+    const context = getPageContext();
+    
     // 1. Convert image to Base64
     const base64 = await imageToBase64(img);
     console.debug("[Translate] Image converted to base64, length:", base64.length);
 
-    // 2. Call AI Service
-    const translationResult = await translateImage(base64);
+    // 2. Call AI Service with context
+    const translationResult = await translateImage(base64, context);
     console.log("[Translate] Result:", translationResult);
+    
+    // Save to cache
+    saveTranslationToCache(src, translationResult);
+    
     return translationResult;
 }
 
