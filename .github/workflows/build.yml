@@ -1,0 +1,50 @@
+name: Build and Publish UserScript
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'vtranslate.user.js'
+      - 'README.md'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build
+        run: pnpm build
+
+      - name: Copy UserScript to root
+        run: cp dist/vtranslate.user.js ./vtranslate.user.js
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if [[ -n $(git status -s vtranslate.user.js) ]]; then
+            git add vtranslate.user.js
+            git commit -m "chore: update vtranslate.user.js [skip ci]"
+            git push
+          else
+            echo "No changes in vtranslate.user.js"
+          fi
