@@ -218,7 +218,7 @@ export function showReaderMode() {
     };
 
     const translateBtn = document.createElement("button");
-    translateBtn.innerText = "Translate";
+    translateBtn.innerText = "翻译当前";
     translateBtn.style.padding = "10px 24px";
     translateBtn.style.backgroundColor = "#4CAF50";
     translateBtn.style.backgroundImage = "linear-gradient(45deg, #4CAF50, #45a049)";
@@ -246,7 +246,7 @@ export function showReaderMode() {
     controlPanel.appendChild(translateBtn);
 
     const translateAllBtn = document.createElement("button");
-    translateAllBtn.innerText = "Translate All";
+    translateAllBtn.innerText = "翻译全部";
     translateAllBtn.style.padding = "10px 24px";
     translateAllBtn.style.backgroundColor = "#2196F3";
     translateAllBtn.style.backgroundImage = "linear-gradient(45deg, #2196F3, #21CBF3)";
@@ -274,7 +274,7 @@ export function showReaderMode() {
     controlPanel.appendChild(translateAllBtn);
 
     const closeBtn = document.createElement("button");
-    closeBtn.innerText = "Close";
+    closeBtn.innerText = "关闭";
     closeBtn.style.padding = "10px 24px";
     closeBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
     closeBtn.style.color = "white";
