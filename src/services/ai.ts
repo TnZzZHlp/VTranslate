@@ -28,7 +28,7 @@ export async function translateImage(imageBase64: string): Promise<TranslationRe
 
     const endpoint = config.endpoint;
     const apiKey = config.apiKey;
-    const model = config.model || "gpt-4o";
+    const model = config.model || "Manga";
     const temperature = config.temperature ?? 0.3;
 
     // Construct the request payload

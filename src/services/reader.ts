@@ -11,20 +11,14 @@ interface ReaderImage {
  * Extracts images from the page, prioritizing 'file' attribute and filtering small images.
  */
 function extractImages(): ReaderImage[] {
-    const images = Array.from(document.querySelectorAll("img"));
+    const images = Array.from(document.querySelectorAll("ignore_js_op img")) as HTMLImageElement[];
+
+    console.debug("[Reader] Extracted images:", images);
+    
     const uniqueSrcs = new Set<string>();
     const validImages: ReaderImage[] = [];
 
     images.forEach((img) => {
-        // Filter out small images (likely icons, spacers)
-        const width = img.naturalWidth || img.clientWidth;
-        const height = img.naturalHeight || img.clientHeight;
-
-        if (width < 200 || height < 200) {
-            return;
-        }
-
-        // Prioritize 'file' attribute for lazy-loaded high-res images
         const src = img.getAttribute("file") || img.src;
 
         if (!src || uniqueSrcs.has(src)) {
@@ -71,9 +65,20 @@ export function showReaderMode() {
     overlay.style.display = "flex";
     overlay.style.flexDirection = "row";
 
-    // Image Container (centered)
+    // Left Translation Panel
+    const leftPanel = document.createElement("div");
+    leftPanel.style.flex = "1"; // Fill available space
+    leftPanel.style.minWidth = "150px";
+    leftPanel.style.height = "100%";
+    leftPanel.style.backgroundColor = "#1a1a1a";
+    leftPanel.style.position = "relative";
+    leftPanel.style.overflowY = "auto";
+    leftPanel.style.borderRight = "1px solid #333";
+
+    // Center Image Container
     const imageContainer = document.createElement("div");
-    imageContainer.style.flex = "1";
+    imageContainer.style.flex = "0 0 auto"; // Don't grow, don't shrink, auto size
+    imageContainer.style.maxWidth = "60%"; // Maximum 60% of screen width
     imageContainer.style.height = "100%";
     imageContainer.style.display = "flex";
     imageContainer.style.justifyContent = "center";
@@ -86,17 +91,31 @@ export function showReaderMode() {
     mainImage.style.maxWidth = "100%";
     mainImage.style.objectFit = "contain";
     mainImage.style.display = "block";
+    
+    // Adjust container width based on actual image size
+    mainImage.onload = () => {
+        const imageAspectRatio = mainImage.naturalWidth / mainImage.naturalHeight;
+        const windowHeight = window.innerHeight;
+        const calculatedWidth = windowHeight * imageAspectRatio;
+        
+        // Use the smaller of calculated width or 60% of window width
+        const maxWidth = window.innerWidth * 0.6;
+        const finalWidth = Math.min(calculatedWidth, maxWidth);
+        
+        imageContainer.style.width = `${finalWidth}px`;
+    };
+    
     imageContainer.appendChild(mainImage);
 
-    // Overlay container for translations (positioned over the image)
-    const translationOverlay = document.createElement("div");
-    translationOverlay.style.position = "absolute";
-    translationOverlay.style.top = "0";
-    translationOverlay.style.left = "0";
-    translationOverlay.style.width = "100%";
-    translationOverlay.style.height = "100%";
-    translationOverlay.style.pointerEvents = "none";
-    imageContainer.appendChild(translationOverlay);
+    // Right Translation Panel
+    const rightPanel = document.createElement("div");
+    rightPanel.style.flex = "1"; // Fill available space
+    rightPanel.style.minWidth = "150px";
+    rightPanel.style.height = "100%";
+    rightPanel.style.backgroundColor = "#1a1a1a";
+    rightPanel.style.position = "relative";
+    rightPanel.style.overflowY = "auto";
+    rightPanel.style.borderLeft = "1px solid #333";
 
     // Navigation Buttons
     const createNavButton = (text: string, right: boolean) => {
@@ -157,7 +176,10 @@ export function showReaderMode() {
     controlPanel.appendChild(closeBtn);
 
     imageContainer.appendChild(controlPanel);
+    
+    overlay.appendChild(leftPanel);
     overlay.appendChild(imageContainer);
+    overlay.appendChild(rightPanel);
     document.body.appendChild(overlay);
 
     // --- Logic ---
@@ -170,12 +192,13 @@ export function showReaderMode() {
         prevBtn.style.display = currentIndex > 0 ? "block" : "none";
         nextBtn.style.display = currentIndex < images.length - 1 ? "block" : "none";
 
-        // Clear translation overlays
-        translationOverlay.innerHTML = "";
+        // Clear translation panels
+        leftPanel.innerHTML = "";
+        rightPanel.innerHTML = "";
 
         // Update translate button
         if (translationCache.has(imgData.src)) {
-            renderTranslationOverlays(translationCache.get(imgData.src)!);
+            renderTranslations(translationCache.get(imgData.src)!);
             translateBtn.innerText = "Translated";
             translateBtn.style.backgroundColor = "#888";
         } else {
@@ -185,37 +208,50 @@ export function showReaderMode() {
         }
     };
 
-    const renderTranslationOverlays = (result: TranslationResult) => {
-        translationOverlay.innerHTML = "";
+    const renderTranslations = (result: TranslationResult) => {
+        leftPanel.innerHTML = "";
+        rightPanel.innerHTML = "";
+
+        // Create positioned containers for each side
+        const leftContainer = document.createElement("div");
+        leftContainer.style.position = "relative";
+        leftContainer.style.width = "100%";
+        leftContainer.style.height = "100%";
+        
+        const rightContainer = document.createElement("div");
+        rightContainer.style.position = "relative";
+        rightContainer.style.width = "100%";
+        rightContainer.style.height = "100%";
 
         result.blocks.forEach((block) => {
             const textBlock = document.createElement("div");
             textBlock.innerText = block.text;
             textBlock.style.position = "absolute";
             textBlock.style.top = `${block.y}%`;
+            textBlock.style.transform = "translateY(-50%)";
+            textBlock.style.width = "90%";
+            textBlock.style.left = "5%";
             
-            // Position based on side
-            if (block.side === "left") {
-                textBlock.style.left = "5%";
-                textBlock.style.textAlign = "left";
-            } else {
-                textBlock.style.right = "5%";
-                textBlock.style.textAlign = "right";
-            }
-
-            textBlock.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+            textBlock.style.backgroundColor = "rgba(30, 30, 30, 0.9)";
             textBlock.style.color = "#fff";
-            textBlock.style.padding = "8px 12px";
+            textBlock.style.padding = "10px 12px";
             textBlock.style.borderRadius = "4px";
-            textBlock.style.fontSize = "16px";
-            textBlock.style.lineHeight = "1.5";
-            textBlock.style.maxWidth = "40%";
-            textBlock.style.pointerEvents = "auto";
-            textBlock.style.boxShadow = "0 2px 8px rgba(0,0,0,0.5)";
-            textBlock.style.transform = "translateY(-50%)"; // Center on y position
+            textBlock.style.fontSize = "15px";
+            textBlock.style.lineHeight = "1.6";
+            textBlock.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
+            textBlock.style.border = "1px solid #444";
 
-            translationOverlay.appendChild(textBlock);
+            if (block.side === "left") {
+                textBlock.style.textAlign = "right";
+                leftContainer.appendChild(textBlock);
+            } else {
+                textBlock.style.textAlign = "left";
+                rightContainer.appendChild(textBlock);
+            }
         });
+
+        leftPanel.appendChild(leftContainer);
+        rightPanel.appendChild(rightContainer);
     };
 
     const doTranslate = async () => {
@@ -230,7 +266,7 @@ export function showReaderMode() {
             const result = await fetchTranslation(imgData.originalElement);
             
             translationCache.set(imgData.src, result);
-            renderTranslationOverlays(result);
+            renderTranslations(result);
             translateBtn.innerText = "Translated";
         } catch (e) {
             console.error(e);
