@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       vtranslate
 // @namespace  npm/vite-plugin-monkey
-// @version    1.1.0
+// @version    1.2.0
 // @icon       https://vitejs.dev/logo.svg
 // @match      https://bbs.yamibo.com/thread-*
 // @match      https://bbs.yamibo.com/forum.php*
@@ -303,6 +303,7 @@
     panel.appendChild(
       createField("Temperature", "temperature", "number", "0.7")
     );
+    panel.appendChild(createField("QPM Limit", "qpm", "number", "No limit"));
     const btnContainer = document.createElement("div");
     btnContainer.style.display = "flex";
     btnContainer.style.justifyContent = "flex-end";
@@ -335,6 +336,7 @@
     }
   }
   async function translateImage(imageBase64, context) {
+    await checkRateLimit();
     console.debug("[AI] Starting translation request.");
     const endpoint = config.endpoint || "https://ai.tnzzz.top/v1/chat/completions";
     const apiKey = config.apiKey || "sk-34c3d7f7f0cc4417b6db3939accbb147";
@@ -478,6 +480,26 @@ ${context ? `
       );
     }
   }
+  const requestTimestamps = [];
+  async function checkRateLimit() {
+    const qpm = config.qpm;
+    if (!qpm || qpm <= 0) return;
+    const now = Date.now();
+    const oneMinuteAgo = now - 6e4;
+    while (requestTimestamps.length > 0 && requestTimestamps[0] < oneMinuteAgo) {
+      requestTimestamps.shift();
+    }
+    if (requestTimestamps.length >= qpm) {
+      const oldestRequest = requestTimestamps[0];
+      const waitTime = oldestRequest + 6e4 - now + 100;
+      console.warn(
+        `[AI] Rate limit reached (${qpm} QPM). Waiting ${waitTime}ms.`
+      );
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+      return checkRateLimit();
+    }
+    requestTimestamps.push(Date.now());
+  }
   const CACHE_KEY = "vtranslate_cache_v1";
   function getCache() {
     return _GM_getValue(CACHE_KEY, {});
@@ -505,10 +527,10 @@ ${context ? `
     }
     return void 0;
   }
-  async function fetchTranslation(img) {
+  async function fetchTranslation(img, force = false) {
     const src = img.getAttribute("file") || img.src;
     const cached = getCachedTranslation(src);
-    if (cached) {
+    if (cached && !force) {
       console.debug("[Translate] Cache hit for:", src);
       return cached;
     }
@@ -570,12 +592,12 @@ ${context ? `
   }
   function showErrorNotification(error, container) {
     const errorDiv = document.createElement("div");
-    errorDiv.style.position = container ? "relative" : "fixed";
-    errorDiv.style.top = container ? "0" : "20px";
-    errorDiv.style.left = container ? "0" : "50%";
-    errorDiv.style.transform = container ? "none" : "translateX(-50%)";
-    errorDiv.style.maxWidth = "500px";
-    errorDiv.style.width = container ? "100%" : "auto";
+    errorDiv.style.position = container ? "absolute" : "fixed";
+    errorDiv.style.top = "20px";
+    errorDiv.style.left = "50%";
+    errorDiv.style.transform = "translateX(-50%)";
+    errorDiv.style.maxWidth = container ? "90%" : "500px";
+    errorDiv.style.width = "auto";
     errorDiv.style.padding = "16px 20px";
     errorDiv.style.backgroundColor = "rgba(220, 38, 38, 0.95)";
     errorDiv.style.backdropFilter = "blur(10px)";
@@ -933,8 +955,9 @@ ${context ? `
       const cachedResult = getCachedTranslation(imgData.src);
       if (cachedResult) {
         renderTranslations(cachedResult);
-        translateBtn.innerText = "已翻译";
-        translateBtn.style.backgroundColor = "#888";
+        translateBtn.innerText = "重新翻译";
+        translateBtn.style.backgroundColor = "#4CAF50";
+        translateBtn.disabled = false;
       } else {
         translateBtn.innerText = "翻译当前";
         translateBtn.style.backgroundColor = "#4CAF50";
@@ -994,14 +1017,19 @@ ${context ? `
     };
     const doTranslate = async () => {
       const imgData = images[currentIndex];
-      if (getCachedTranslation(imgData.src)) return;
+      const isRetranslate = !!getCachedTranslation(imgData.src);
       translateBtn.disabled = true;
       translateBtn.innerText = "翻译中...";
       translateBtn.style.backgroundColor = "#888";
       try {
-        const result = await fetchTranslation(imgData.originalElement);
+        const result = await fetchTranslation(
+          imgData.originalElement,
+          isRetranslate
+        );
         renderTranslations(result);
-        translateBtn.innerText = "已翻译";
+        translateBtn.innerText = "重新翻译";
+        translateBtn.style.backgroundColor = "#4CAF50";
+        translateBtn.disabled = false;
       } catch (e) {
         console.error(e);
         const errorNotification = showErrorNotification(e);
@@ -1242,8 +1270,9 @@ ${context ? `
       const cachedResult = getCachedTranslation(imgData.src);
       if (cachedResult) {
         renderTranslations(cachedResult);
-        translateBtn.innerText = "已翻译";
-        translateBtn.style.backgroundColor = "#888";
+        translateBtn.innerText = "重新翻译";
+        translateBtn.style.backgroundColor = "#4CAF50";
+        translateBtn.disabled = false;
       } else {
         translateBtn.innerText = "翻译当前";
         translateBtn.style.backgroundColor = "#4CAF50";
@@ -1327,14 +1356,19 @@ ${context ? `
     };
     const doTranslate = async () => {
       const imgData = images[currentIndex];
-      if (getCachedTranslation(imgData.src)) return;
+      const isRetranslate = !!getCachedTranslation(imgData.src);
       translateBtn.disabled = true;
       translateBtn.innerText = "翻译中...";
       translateBtn.style.backgroundColor = "#888";
       try {
-        const result = await fetchTranslation(imgData.originalElement);
+        const result = await fetchTranslation(
+          imgData.originalElement,
+          isRetranslate
+        );
         renderTranslations(result);
-        translateBtn.innerText = "已翻译";
+        translateBtn.innerText = "重新翻译";
+        translateBtn.style.backgroundColor = "#4CAF50";
+        translateBtn.disabled = false;
         translationsContainer.style.display = "block";
         controlPanel.style.display = "flex";
       } catch (e) {
