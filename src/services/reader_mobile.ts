@@ -21,19 +21,25 @@ export function showMobileReader(images: ReaderImage[]) {
     overlay.style.display = "flex";
     overlay.style.flexDirection = "column";
 
-    // Translation Panels (Overlays)
+    // Translation Container (Bottom Sheet Style)
     const translationsContainer = document.createElement("div");
     translationsContainer.style.position = "absolute";
-    translationsContainer.style.top = "0";
+    translationsContainer.style.bottom = "0";
     translationsContainer.style.left = "0";
     translationsContainer.style.width = "100%";
-    translationsContainer.style.height = "100%";
+    translationsContainer.style.maxHeight = "60%";
     translationsContainer.style.zIndex = "10";
-    translationsContainer.style.pointerEvents = "none";
     translationsContainer.style.display = "none"; // Hidden initially
     translationsContainer.style.overflowY = "auto";
-    translationsContainer.style.padding = "20px";
+    translationsContainer.style.padding = "16px";
     translationsContainer.style.boxSizing = "border-box";
+    translationsContainer.style.backgroundColor = "rgba(0, 0, 0, 0.95)";
+    translationsContainer.style.backdropFilter = "blur(10px)";
+    translationsContainer.style.borderTop =
+        "1px solid rgba(255, 255, 255, 0.1)";
+    translationsContainer.style.transition = "transform 0.3s ease-out";
+    translationsContainer.style.borderRadius = "16px 16px 0 0";
+    translationsContainer.style.boxShadow = "0 -4px 20px rgba(0, 0, 0, 0.5)";
 
     // Center Image Container
     const imageContainer = document.createElement("div");
@@ -52,6 +58,7 @@ export function showMobileReader(images: ReaderImage[]) {
     mainImage.style.maxWidth = "100%";
     mainImage.style.objectFit = "contain";
     mainImage.style.display = "block";
+    mainImage.style.transition = "opacity 0.2s ease";
 
     mainImage.onload = () => {
         imageContainer.style.width = "100%";
@@ -187,27 +194,100 @@ export function showMobileReader(images: ReaderImage[]) {
     const renderTranslations = (result: TranslationResult) => {
         translationsContainer.innerHTML = "";
 
-        // Just append blocks in order
-        // Sort by Y to keep reading order
-        const blocks = [...result.blocks].sort((a, b) => a.y - b.y);
+        // Add a drag handle indicator
+        const dragHandle = document.createElement("div");
+        dragHandle.style.width = "40px";
+        dragHandle.style.height = "4px";
+        dragHandle.style.backgroundColor = "rgba(255, 255, 255, 0.3)";
+        dragHandle.style.borderRadius = "2px";
+        dragHandle.style.margin = "0 auto 16px auto";
+        translationsContainer.appendChild(dragHandle);
 
-        blocks.forEach((block) => {
+        // Split blocks by side
+        const leftBlocks = result.blocks.filter((b) => b.side === "left");
+        const rightBlocks = result.blocks.filter((b) => b.side !== "left");
+
+        // Sort by Y to keep reading order
+        const sortedLeftBlocks = [...leftBlocks].sort((a, b) => a.y - b.y);
+        const sortedRightBlocks = [...rightBlocks].sort((a, b) => a.y - b.y);
+
+        // Combine and sort all blocks for animation index
+        const allBlocks = [...sortedLeftBlocks, ...sortedRightBlocks];
+
+        // Render left blocks
+        sortedLeftBlocks.forEach((block) => {
             const textBlock = document.createElement("div");
             textBlock.innerText = block.text;
             textBlock.style.width = "fit-content";
             textBlock.style.maxWidth = "90%";
-            textBlock.style.marginBottom = "10px";
-            textBlock.style.backgroundColor = "rgba(30, 30, 30, 0.9)";
+            textBlock.style.marginBottom = "12px";
+            textBlock.style.marginLeft = "0"; // Align to left
+            textBlock.style.marginRight = "auto";
+            textBlock.style.backgroundColor = "rgba(40, 40, 40, 0.8)";
             textBlock.style.color = "#fff";
-            textBlock.style.padding = "10px 12px";
-            textBlock.style.borderRadius = "4px";
+            textBlock.style.padding = "12px 14px";
+            textBlock.style.borderRadius = "8px";
             textBlock.style.fontSize = "15px";
             textBlock.style.lineHeight = "1.6";
-            textBlock.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
-            textBlock.style.border = "1px solid #444";
-            textBlock.style.pointerEvents = "auto"; // Allow interaction
+            textBlock.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.2)";
+            textBlock.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+            textBlock.style.borderLeft = "3px solid rgba(76, 175, 80, 0.6)"; // Left indicator
+            textBlock.style.wordWrap = "break-word";
+            textBlock.style.textAlign = "left";
+            textBlock.style.transition = "background-color 0.2s ease";
+
+            // Add subtle animation on render
+            textBlock.style.opacity = "0";
+            textBlock.style.transform = "translateX(-10px)";
 
             translationsContainer.appendChild(textBlock);
+
+            // Trigger animation
+            const index = allBlocks.indexOf(block);
+            setTimeout(() => {
+                textBlock.style.transition =
+                    "opacity 0.3s ease, transform 0.3s ease, background-color 0.2s ease";
+                textBlock.style.opacity = "1";
+                textBlock.style.transform = "translateX(0)";
+            }, index * 50);
+        });
+
+        // Render right blocks
+        sortedRightBlocks.forEach((block) => {
+            const textBlock = document.createElement("div");
+            textBlock.innerText = block.text;
+            textBlock.style.width = "fit-content";
+            textBlock.style.maxWidth = "90%";
+            textBlock.style.marginBottom = "12px";
+            textBlock.style.marginLeft = "auto"; // Align to right
+            textBlock.style.marginRight = "0";
+            textBlock.style.backgroundColor = "rgba(40, 40, 40, 0.8)";
+            textBlock.style.color = "#fff";
+            textBlock.style.padding = "12px 14px";
+            textBlock.style.borderRadius = "8px";
+            textBlock.style.fontSize = "15px";
+            textBlock.style.lineHeight = "1.6";
+            textBlock.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.2)";
+            textBlock.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+            textBlock.style.borderRight = "3px solid rgba(33, 150, 243, 0.6)"; // Right indicator
+            textBlock.style.wordWrap = "break-word";
+            textBlock.style.textAlign = "right";
+            textBlock.style.transition = "background-color 0.2s ease";
+
+            // Add subtle animation on render
+            textBlock.style.opacity = "0";
+            textBlock.style.transform = "translateX(10px)";
+
+            translationsContainer.appendChild(textBlock);
+
+            // Trigger animation
+            const index = allBlocks.indexOf(block);
+            setTimeout(() => {
+                textBlock.style.transition =
+                    "opacity 0.3s ease, transform 0.3s ease, background-color 0.2s ease";
+                textBlock.style.opacity = "1";
+                textBlock.style.transform = "translateX(0)";
+            }, index * 50);
         });
     };
 
@@ -260,11 +340,32 @@ export function showMobileReader(images: ReaderImage[]) {
             return;
         }
 
-        // Toggle visibility
-        const display =
-            translationsContainer.style.display === "none" ? "block" : "none";
-        translationsContainer.style.display = display;
-        controlPanel.style.display = display === "none" ? "none" : "flex";
+        // Toggle visibility with smooth animation
+        const isVisible = translationsContainer.style.display === "block";
+
+        if (isVisible) {
+            // Hide with fade out
+            translationsContainer.style.opacity = "0";
+            translationsContainer.style.transform = "translateY(20px)";
+            setTimeout(() => {
+                translationsContainer.style.display = "none";
+                controlPanel.style.display = "none";
+            }, 300);
+        } else {
+            // Show with fade in
+            translationsContainer.style.display = "block";
+            translationsContainer.style.opacity = "0";
+            translationsContainer.style.transform = "translateY(20px)";
+            controlPanel.style.display = "flex";
+
+            // Trigger animation
+            setTimeout(() => {
+                translationsContainer.style.transition =
+                    "opacity 0.3s ease, transform 0.3s ease";
+                translationsContainer.style.opacity = "1";
+                translationsContainer.style.transform = "translateY(0)";
+            }, 10);
+        }
     };
 
     closeBtn.onclick = () => {
