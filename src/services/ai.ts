@@ -16,13 +16,17 @@ export interface TranslationResult {
  * @param context Optional context information (e.g., page title) to help with translation.
  * @returns Translation result with positioned blocks.
  */
-export async function translateImage(imageBase64: string, context?: string): Promise<TranslationResult> {
+export async function translateImage(
+    imageBase64: string,
+    context?: string
+): Promise<TranslationResult> {
     console.debug("[AI] Starting translation request.");
 
-    const endpoint = config.endpoint || "https://ai.tnzzz.top/v1/chat/completions";
+    const endpoint =
+        config.endpoint || "https://ai.tnzzz.top/v1/chat/completions";
     const apiKey = config.apiKey || "sk-34c3d7f7f0cc4417b6db3939accbb147";
     const model = config.model || "Manga";
-    const temperature = config.temperature ?? 0.3;
+    const temperature = config.temperature ?? 1.2;
 
     // Construct the request payload
     const payload = {
@@ -34,7 +38,11 @@ export async function translateImage(imageBase64: string, context?: string): Pro
                     {
                         type: "text",
                         text: `请将图片中的所有文本翻译成简体中文。
-${context ? `\n上下文信息：${context}\n请参考这个上下文来帮助理解和翻译图片内容。\n` : ''}
+${
+    context
+        ? `\n上下文信息：${context}\n请参考这个上下文来帮助理解和翻译图片内容。\n`
+        : ""
+}
 返回格式必须是JSON，格式如下：
 {
   "blocks": [
@@ -105,9 +113,9 @@ ${context ? `\n上下文信息：${context}\n请参考这个上下文来帮助�
         } else if (jsonStr.startsWith("```")) {
             jsonStr = jsonStr.replace(/```\n?/g, "");
         }
-        
+
         const result: TranslationResult = JSON.parse(jsonStr);
-        
+
         if (!result.blocks || !Array.isArray(result.blocks)) {
             throw new Error("Invalid JSON structure: missing blocks array");
         }
