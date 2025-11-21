@@ -12,7 +12,9 @@ function setCache(cache: Record<string, TranslationResult>) {
     GM_setValue(CACHE_KEY, cache);
 }
 
-export function getCachedTranslation(src: string): TranslationResult | undefined {
+export function getCachedTranslation(
+    src: string
+): TranslationResult | undefined {
     const cache = getCache();
     return cache[src];
 }
@@ -43,9 +45,11 @@ function getPageContext(): string | undefined {
  * @param img The image element to translate.
  * @returns The translation result with positioned blocks.
  */
-export async function fetchTranslation(img: HTMLImageElement): Promise<TranslationResult> {
+export async function fetchTranslation(
+    img: HTMLImageElement
+): Promise<TranslationResult> {
     const src = img.getAttribute("file") || img.src;
-    
+
     // Check cache first
     const cached = getCachedTranslation(src);
     if (cached) {
@@ -54,21 +58,24 @@ export async function fetchTranslation(img: HTMLImageElement): Promise<Translati
     }
 
     console.debug("[Translate] Starting translation for image.", img);
-    
+
     // Get page context (title)
     const context = getPageContext();
-    
+
     // 1. Convert image to Base64
     const base64 = await imageToBase64(img);
-    console.debug("[Translate] Image converted to base64, length:", base64.length);
+    console.debug(
+        "[Translate] Image converted to base64, length:",
+        base64.length
+    );
 
     // 2. Call AI Service with context
     const translationResult = await translateImage(base64, context);
     console.log("[Translate] Result:", translationResult);
-    
+
     // Save to cache
     saveTranslationToCache(src, translationResult);
-    
+
     return translationResult;
 }
 
@@ -76,7 +83,7 @@ export async function translateText(img: HTMLImageElement) {
     try {
         const result = await fetchTranslation(img);
         // 3. Display result - convert blocks to text for modal
-        const text = result.blocks.map(b => b.text).join("\n\n");
+        const text = result.blocks.map((b) => b.text).join("\n\n");
         showTranslationModal(img, text);
     } catch (error) {
         console.error("[Translate] Error during translation:", error);
@@ -108,18 +115,24 @@ function imageToBase64(img: HTMLImageElement): Promise<string> {
         };
 
         if (fileAttr) {
-            console.debug("[Translate] Found 'file' attribute, loading real image:", fileAttr);
+            console.debug(
+                "[Translate] Found 'file' attribute, loading real image:",
+                fileAttr
+            );
             const realImage = new Image();
             realImage.crossOrigin = "Anonymous"; // Try to handle CORS if possible
             realImage.src = fileAttr;
-            
+
             realImage.onload = () => {
                 console.debug("[Translate] Real image loaded.");
                 processImage(realImage);
             };
 
             realImage.onerror = (e) => {
-                console.warn("[Translate] Failed to load real image from 'file' attribute, falling back to src.", e);
+                console.warn(
+                    "[Translate] Failed to load real image from 'file' attribute, falling back to src.",
+                    e
+                );
                 processImage(img);
             };
         } else {
@@ -127,5 +140,3 @@ function imageToBase64(img: HTMLImageElement): Promise<string> {
         }
     });
 }
-
-
