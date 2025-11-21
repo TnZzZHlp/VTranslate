@@ -1,6 +1,165 @@
 /**
  * Shows a side-by-side modal with the original image and the translated text.
  */
+export function injectStyles() {
+    if (document.getElementById("vtranslate-styles")) return;
+
+    const style = document.createElement("style");
+    style.id = "vtranslate-styles";
+    style.textContent = `
+        /* Global Overlay */
+        .vtranslate-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Translation Modal */
+        .vtranslate-modal {
+            display: flex;
+            width: 90%;
+            height: 80%;
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            font-family: system-ui, -apple-system, sans-serif;
+            flex-direction: row;
+        }
+
+        .vtranslate-image-container {
+            flex: 1;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .vtranslate-text-container {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            color: #e0e0e0;
+            font-size: 16px;
+            line-height: 1.6;
+            background-color: #1e1e1e;
+            position: relative;
+        }
+
+        /* Settings Panel */
+        .vtranslate-settings-panel {
+            width: 400px;
+            max-width: 90%;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            color: #fff;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        /* Reader Mode */
+        .vtranslate-reader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            z-index: 10002;
+            display: flex;
+            flex-direction: row;
+        }
+
+        .vtranslate-reader-panel {
+            flex: 1;
+            min-width: 150px;
+            height: 100%;
+            background-color: #1a1a1a;
+            position: relative;
+            overflow-y: auto;
+            border-color: #333;
+            border-style: solid;
+        }
+        .vtranslate-reader-panel-left { border-right-width: 1px; }
+        .vtranslate-reader-panel-right { border-left-width: 1px; }
+
+        .vtranslate-reader-center {
+            flex: 0 0 auto;
+            max-width: 60%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        /* Mobile Adaptations */
+        @media (max-width: 768px) {
+            /* Translation Modal */
+            .vtranslate-modal {
+                flex-direction: column;
+                height: 90%;
+            }
+            .vtranslate-image-container {
+                flex: 0 0 40%;
+                padding: 10px;
+            }
+            .vtranslate-text-container {
+                flex: 1;
+                padding: 20px;
+            }
+
+            /* Reader Mode */
+            .vtranslate-reader-overlay {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+            .vtranslate-reader-center {
+                order: 1;
+                max-width: 100%;
+                width: 100% !important;
+                flex: none;
+                height: auto;
+                max-height: 60%;
+            }
+            .vtranslate-reader-panel {
+                order: 2;
+                min-width: 0;
+                width: 100%;
+                height: auto;
+                flex: none;
+                overflow-y: visible;
+                border: none;
+                border-top: 1px solid #333;
+            }
+            .vtranslate-reader-panel-left { order: 2; }
+            .vtranslate-reader-panel-right { order: 3; }
+
+            .vtranslate-text-block {
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+                width: 100% !important;
+                margin-bottom: 10px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 /**
  * Shows a side-by-side modal with the original image and the translated text.
  */
@@ -91,7 +250,7 @@ export function showTranslationModal(img: HTMLImageElement, text: string) {
     closeBtn.style.opacity = "0.7";
     closeBtn.onmouseover = () => (closeBtn.style.opacity = "1");
     closeBtn.onmouseout = () => (closeBtn.style.opacity = "0.7");
-    
+
     // Close logic
     const close = () => {
         document.body.removeChild(overlay);
@@ -114,7 +273,11 @@ import { config } from "./config";
 /**
  * Creates a floating button on the page.
  */
-export function createFloatingButton(iconSvg: string, onClick: () => void, bottomOffset: string = "20px") {
+export function createFloatingButton(
+    iconSvg: string,
+    onClick: () => void,
+    bottomOffset: string = "20px"
+) {
     const button = document.createElement("div");
     button.innerHTML = iconSvg;
     button.style.position = "fixed";
@@ -189,7 +352,12 @@ function showSettingsPanel() {
     panel.appendChild(title);
 
     // Helper to create input fields
-    const createField = (label: string, key: keyof typeof config, type: string = "text", placeholder: string = "") => {
+    const createField = (
+        label: string,
+        key: keyof typeof config,
+        type: string = "text",
+        placeholder: string = ""
+    ) => {
         const container = document.createElement("div");
         container.style.marginBottom = "16px";
 
@@ -224,9 +392,18 @@ function showSettingsPanel() {
     };
 
     panel.appendChild(createField("API Key", "apiKey", "password", "sk-..."));
-    panel.appendChild(createField("API Endpoint", "endpoint", "text", "https://api.openai.com/v1/chat/completions"));
+    panel.appendChild(
+        createField(
+            "API Endpoint",
+            "endpoint",
+            "text",
+            "https://api.openai.com/v1/chat/completions"
+        )
+    );
     panel.appendChild(createField("Model", "model", "text", "gpt-4o"));
-    panel.appendChild(createField("Temperature", "temperature", "number", "0.7"));
+    panel.appendChild(
+        createField("Temperature", "temperature", "number", "0.7")
+    );
 
     // Buttons
     const btnContainer = document.createElement("div");
@@ -256,4 +433,3 @@ function showSettingsPanel() {
         if (e.target === overlay) document.body.removeChild(overlay);
     };
 }
-

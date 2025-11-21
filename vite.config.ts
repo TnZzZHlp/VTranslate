@@ -13,7 +13,7 @@ export default defineConfig({
                     "https://bbs.yamibo.com/thread-*",
                     "https://bbs.yamibo.com/forum.php*",
                 ],
-                version: "1.0.0",
+                version: "1.1.0",
             },
         }),
     ],
