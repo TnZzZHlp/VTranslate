@@ -2,6 +2,7 @@ import { fetchTranslation, getCachedTranslation } from "./trasnlate";
 import { injectStyles } from "./ui";
 import { TranslationResult } from "./ai";
 import { ReaderImage } from "./reader_types";
+import { showErrorNotification } from "./error_display";
 
 export function showMobileReader(images: ReaderImage[]) {
     let currentIndex = 0;
@@ -309,7 +310,11 @@ export function showMobileReader(images: ReaderImage[]) {
             controlPanel.style.display = "flex";
         } catch (e) {
             console.error(e);
-            alert("Translation failed. See console.");
+
+            // Show error notification in the image container
+            const errorNotification = showErrorNotification(e, imageContainer);
+            imageContainer.appendChild(errorNotification);
+
             translateBtn.disabled = false;
             translateBtn.innerText = "重试";
             translateBtn.style.backgroundColor = "#f44336";
