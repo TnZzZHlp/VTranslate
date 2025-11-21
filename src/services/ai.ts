@@ -10,6 +10,18 @@ export interface TranslationResult {
     blocks: TranslationBlock[];
 }
 
+export class TranslationError extends Error {
+    constructor(
+        message: string,
+        public readonly userMessage: string,
+        public readonly statusCode?: number,
+        public readonly details?: string
+    ) {
+        super(message);
+        this.name = "TranslationError";
+    }
+}
+
 /**
  * Translates an image using an AI service.
  * @param imageBase64 Base64-encoded image (data URL format).
@@ -93,7 +105,51 @@ ${
     if (!response.ok) {
         const errorText = await response.text();
         console.error("[AI] API request failed:", errorText);
-        throw new Error(`API request failed: ${response.status} ${errorText}`);
+
+        let userMessage = "翻译请求失败";
+        let details = errorText;
+
+        // Parse error details if possible
+        try {
+            const errorData = JSON.parse(errorText);
+            details =
+                errorData.error?.message || errorData.message || errorText;
+        } catch {
+            // Keep original error text
+        }
+
+        // Provide user-friendly messages based on status code
+        switch (response.status) {
+            case 400:
+                userMessage = "请求格式错误，请检查配置";
+                break;
+            case 401:
+                userMessage = "API密钥无效，请检查配置";
+                break;
+            case 403:
+                userMessage = "访问被拒绝，请检查API权限";
+                break;
+            case 404:
+                userMessage = "API端点不存在，请检查配置";
+                break;
+            case 429:
+                userMessage = "请求过于频繁，请稍后再试";
+                break;
+            case 500:
+            case 502:
+            case 503:
+                userMessage = "服务器错误，请稍后再试";
+                break;
+            default:
+                userMessage = `请求失败 (${response.status})`;
+        }
+
+        throw new TranslationError(
+            `API request failed: ${response.status}`,
+            userMessage,
+            response.status,
+            details
+        );
     }
 
     const data = await response.json();
@@ -101,7 +157,12 @@ ${
 
     const content = data.choices?.[0]?.message?.content || "";
     if (!content) {
-        throw new Error("No content in API response.");
+        throw new TranslationError(
+            "No content in API response",
+            "AI返回了空响应，请重试",
+            undefined,
+            JSON.stringify(data)
+        );
     }
 
     // Parse JSON response
@@ -117,12 +178,28 @@ ${
         const result: TranslationResult = JSON.parse(jsonStr);
 
         if (!result.blocks || !Array.isArray(result.blocks)) {
-            throw new Error("Invalid JSON structure: missing blocks array");
+            throw new TranslationError(
+                "Invalid JSON structure: missing blocks array",
+                "AI返回的数据格式不正确",
+                undefined,
+                `返回内容: ${jsonStr.substring(0, 200)}...`
+            );
         }
 
         return result;
     } catch (e) {
         console.error("[AI] Failed to parse JSON response:", content, e);
-        throw new Error(`Failed to parse AI response as JSON: ${e}`);
+
+        // If it's already a TranslationError, rethrow it
+        if (e instanceof TranslationError) {
+            throw e;
+        }
+
+        throw new TranslationError(
+            `Failed to parse AI response as JSON: ${e}`,
+            "无法解析AI返回的翻译结果",
+            undefined,
+            `返回内容: ${content.substring(0, 200)}...`
+        );
     }
 }
