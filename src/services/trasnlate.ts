@@ -46,13 +46,14 @@ function getPageContext(): string | undefined {
  * @returns The translation result with positioned blocks.
  */
 export async function fetchTranslation(
-    img: HTMLImageElement
+    img: HTMLImageElement,
+    force: boolean = false
 ): Promise<TranslationResult> {
     const src = img.getAttribute("file") || img.src;
 
     // Check cache first
     const cached = getCachedTranslation(src);
-    if (cached) {
+    if (cached && !force) {
         console.debug("[Translate] Cache hit for:", src);
         return cached;
     }
