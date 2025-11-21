@@ -5,6 +5,7 @@ export interface Config {
     endpoint: string;
     model: string;
     temperature: number;
+    qpm?: number;
 }
 
 const CONFIG_STORAGE_KEY = "vtranslate_config";

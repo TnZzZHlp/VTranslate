@@ -404,6 +404,7 @@ function showSettingsPanel() {
     panel.appendChild(
         createField("Temperature", "temperature", "number", "0.7")
     );
+    panel.appendChild(createField("QPM Limit", "qpm", "number", "No limit"));
 
     // Buttons
     const btnContainer = document.createElement("div");

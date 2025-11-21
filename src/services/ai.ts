@@ -32,6 +32,8 @@ export async function translateImage(
     imageBase64: string,
     context?: string
 ): Promise<TranslationResult> {
+    await checkRateLimit();
+
     console.debug("[AI] Starting translation request.");
 
     const endpoint =
@@ -202,4 +204,38 @@ ${
             `返回内容: ${content.substring(0, 200)}...`
         );
     }
+}
+
+// Rate Limiting Logic
+const requestTimestamps: number[] = [];
+
+async function checkRateLimit() {
+    const qpm = config.qpm;
+    if (!qpm || qpm <= 0) return;
+
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+
+    // Remove timestamps older than 1 minute
+    while (requestTimestamps.length > 0 && requestTimestamps[0] < oneMinuteAgo) {
+        requestTimestamps.shift();
+    }
+
+    if (requestTimestamps.length >= qpm) {
+        // Calculate wait time
+        const oldestRequest = requestTimestamps[0];
+        const waitTime = oldestRequest + 60000 - now + 100; // Add small buffer
+
+        console.warn(
+            `[AI] Rate limit reached (${qpm} QPM). Waiting ${waitTime}ms.`
+        );
+
+        // Wait for the slot to open up
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+
+        // Re-check recursively (in case multiple requests were waiting)
+        return checkRateLimit();
+    }
+
+    requestTimestamps.push(Date.now());
 }

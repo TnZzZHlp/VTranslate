@@ -261,8 +261,9 @@ export function showDesktopReader(images: ReaderImage[]) {
         const cachedResult = getCachedTranslation(imgData.src);
         if (cachedResult) {
             renderTranslations(cachedResult);
-            translateBtn.innerText = "已翻译";
-            translateBtn.style.backgroundColor = "#888";
+            translateBtn.innerText = "重新翻译";
+            translateBtn.style.backgroundColor = "#4CAF50";
+            translateBtn.disabled = false;
         } else {
             translateBtn.innerText = "翻译当前";
             translateBtn.style.backgroundColor = "#4CAF50";
@@ -345,16 +346,21 @@ export function showDesktopReader(images: ReaderImage[]) {
 
     const doTranslate = async () => {
         const imgData = images[currentIndex];
-        if (getCachedTranslation(imgData.src)) return;
+        const isRetranslate = !!getCachedTranslation(imgData.src);
 
         translateBtn.disabled = true;
         translateBtn.innerText = "翻译中...";
         translateBtn.style.backgroundColor = "#888";
 
         try {
-            const result = await fetchTranslation(imgData.originalElement);
+            const result = await fetchTranslation(
+                imgData.originalElement,
+                isRetranslate
+            );
             renderTranslations(result);
-            translateBtn.innerText = "已翻译";
+            translateBtn.innerText = "重新翻译";
+            translateBtn.style.backgroundColor = "#4CAF50";
+            translateBtn.disabled = false;
         } catch (e) {
             console.error(e);
 

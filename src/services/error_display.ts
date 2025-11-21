@@ -8,12 +8,12 @@ export function showErrorNotification(
     container?: HTMLElement
 ): HTMLElement {
     const errorDiv = document.createElement("div");
-    errorDiv.style.position = container ? "relative" : "fixed";
-    errorDiv.style.top = container ? "0" : "20px";
-    errorDiv.style.left = container ? "0" : "50%";
-    errorDiv.style.transform = container ? "none" : "translateX(-50%)";
-    errorDiv.style.maxWidth = "500px";
-    errorDiv.style.width = container ? "100%" : "auto";
+    errorDiv.style.position = container ? "absolute" : "fixed";
+    errorDiv.style.top = "20px";
+    errorDiv.style.left = "50%";
+    errorDiv.style.transform = "translateX(-50%)";
+    errorDiv.style.maxWidth = container ? "90%" : "500px";
+    errorDiv.style.width = "auto";
     errorDiv.style.padding = "16px 20px";
     errorDiv.style.backgroundColor = "rgba(220, 38, 38, 0.95)";
     errorDiv.style.backdropFilter = "blur(10px)";
