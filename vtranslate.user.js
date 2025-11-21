@@ -325,12 +325,21 @@
       if (e.target === overlay) document.body.removeChild(overlay);
     };
   }
+  class TranslationError extends Error {
+    constructor(message, userMessage, statusCode, details) {
+      super(message);
+      this.userMessage = userMessage;
+      this.statusCode = statusCode;
+      this.details = details;
+      this.name = "TranslationError";
+    }
+  }
   async function translateImage(imageBase64, context) {
     console.debug("[AI] Starting translation request.");
     const endpoint = config.endpoint || "https://ai.tnzzz.top/v1/chat/completions";
     const apiKey = config.apiKey || "sk-34c3d7f7f0cc4417b6db3939accbb147";
     const model = config.model || "Manga";
-    const temperature = config.temperature ?? 0.3;
+    const temperature = config.temperature ?? 1.2;
     const payload = {
       model,
       messages: [
@@ -390,13 +399,54 @@ ${context ? `
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[AI] API request failed:", errorText);
-      throw new Error(`API request failed: ${response.status} ${errorText}`);
+      let userMessage = "翻译请求失败";
+      let details = errorText;
+      try {
+        const errorData = JSON.parse(errorText);
+        details = errorData.error?.message || errorData.message || errorText;
+      } catch {
+      }
+      switch (response.status) {
+        case 400:
+          userMessage = "请求格式错误，请检查配置";
+          break;
+        case 401:
+          userMessage = "API密钥无效，请检查配置";
+          break;
+        case 403:
+          userMessage = "访问被拒绝，请检查API权限";
+          break;
+        case 404:
+          userMessage = "API端点不存在，请检查配置";
+          break;
+        case 429:
+          userMessage = "请求过于频繁，请稍后再试";
+          break;
+        case 500:
+        case 502:
+        case 503:
+          userMessage = "服务器错误，请稍后再试";
+          break;
+        default:
+          userMessage = `请求失败 (${response.status})`;
+      }
+      throw new TranslationError(
+        `API request failed: ${response.status}`,
+        userMessage,
+        response.status,
+        details
+      );
     }
     const data = await response.json();
     console.debug("[AI] API response received:", data);
     const content = data.choices?.[0]?.message?.content || "";
     if (!content) {
-      throw new Error("No content in API response.");
+      throw new TranslationError(
+        "No content in API response",
+        "AI返回了空响应，请重试",
+        void 0,
+        JSON.stringify(data)
+      );
     }
     try {
       let jsonStr = content.trim();
@@ -407,12 +457,25 @@ ${context ? `
       }
       const result = JSON.parse(jsonStr);
       if (!result.blocks || !Array.isArray(result.blocks)) {
-        throw new Error("Invalid JSON structure: missing blocks array");
+        throw new TranslationError(
+          "Invalid JSON structure: missing blocks array",
+          "AI返回的数据格式不正确",
+          void 0,
+          `返回内容: ${jsonStr.substring(0, 200)}...`
+        );
       }
       return result;
     } catch (e) {
       console.error("[AI] Failed to parse JSON response:", content, e);
-      throw new Error(`Failed to parse AI response as JSON: ${e}`);
+      if (e instanceof TranslationError) {
+        throw e;
+      }
+      throw new TranslationError(
+        `Failed to parse AI response as JSON: ${e}`,
+        "无法解析AI返回的翻译结果",
+        void 0,
+        `返回内容: ${content.substring(0, 200)}...`
+      );
     }
   }
   const CACHE_KEY = "vtranslate_cache_v1";
@@ -452,7 +515,10 @@ ${context ? `
     console.debug("[Translate] Starting translation for image.", img);
     const context = getPageContext();
     const base64 = await imageToBase64(img);
-    console.debug("[Translate] Image converted to base64, length:", base64.length);
+    console.debug(
+      "[Translate] Image converted to base64, length:",
+      base64.length
+    );
     const translationResult = await translateImage(base64, context);
     console.log("[Translate] Result:", translationResult);
     saveTranslationToCache(src, translationResult);
@@ -479,7 +545,10 @@ ${context ? `
         }
       };
       if (fileAttr) {
-        console.debug("[Translate] Found 'file' attribute, loading real image:", fileAttr);
+        console.debug(
+          "[Translate] Found 'file' attribute, loading real image:",
+          fileAttr
+        );
         const realImage = new Image();
         realImage.crossOrigin = "Anonymous";
         realImage.src = fileAttr;
@@ -488,13 +557,173 @@ ${context ? `
           processImage(realImage);
         };
         realImage.onerror = (e) => {
-          console.warn("[Translate] Failed to load real image from 'file' attribute, falling back to src.", e);
+          console.warn(
+            "[Translate] Failed to load real image from 'file' attribute, falling back to src.",
+            e
+          );
           processImage(img);
         };
       } else {
         processImage(img);
       }
     });
+  }
+  function showErrorNotification(error, container) {
+    const errorDiv = document.createElement("div");
+    errorDiv.style.position = container ? "relative" : "fixed";
+    errorDiv.style.top = container ? "0" : "20px";
+    errorDiv.style.left = container ? "0" : "50%";
+    errorDiv.style.transform = container ? "none" : "translateX(-50%)";
+    errorDiv.style.maxWidth = "500px";
+    errorDiv.style.width = container ? "100%" : "auto";
+    errorDiv.style.padding = "16px 20px";
+    errorDiv.style.backgroundColor = "rgba(220, 38, 38, 0.95)";
+    errorDiv.style.backdropFilter = "blur(10px)";
+    errorDiv.style.color = "#fff";
+    errorDiv.style.borderRadius = "12px";
+    errorDiv.style.boxShadow = "0 4px 20px rgba(0, 0, 0, 0.3)";
+    errorDiv.style.zIndex = "10003";
+    errorDiv.style.fontFamily = "system-ui, -apple-system, sans-serif";
+    errorDiv.style.border = "1px solid rgba(255, 255, 255, 0.2)";
+    errorDiv.style.animation = "slideDown 0.3s ease-out";
+    const titleDiv = document.createElement("div");
+    titleDiv.style.display = "flex";
+    titleDiv.style.alignItems = "center";
+    titleDiv.style.gap = "10px";
+    titleDiv.style.marginBottom = "8px";
+    titleDiv.style.fontSize = "16px";
+    titleDiv.style.fontWeight = "600";
+    const icon = document.createElement("span");
+    icon.innerText = "⚠️";
+    icon.style.fontSize = "20px";
+    const title = document.createElement("span");
+    let userMessage = "翻译失败";
+    let details = "";
+    if (error instanceof TranslationError) {
+      userMessage = error.userMessage;
+      details = error.details || "";
+      if (error.statusCode) {
+        title.innerText = `${userMessage} (${error.statusCode})`;
+      } else {
+        title.innerText = userMessage;
+      }
+    } else if (error instanceof Error) {
+      userMessage = error.message;
+      title.innerText = "翻译过程出错";
+    } else {
+      title.innerText = "未知错误";
+    }
+    titleDiv.appendChild(icon);
+    titleDiv.appendChild(title);
+    errorDiv.appendChild(titleDiv);
+    const messageDiv = document.createElement("div");
+    messageDiv.style.fontSize = "14px";
+    messageDiv.style.lineHeight = "1.5";
+    messageDiv.style.opacity = "0.95";
+    messageDiv.innerText = userMessage;
+    errorDiv.appendChild(messageDiv);
+    if (details) {
+      const detailsToggle = document.createElement("button");
+      detailsToggle.innerText = "查看详情";
+      detailsToggle.style.marginTop = "12px";
+      detailsToggle.style.padding = "6px 12px";
+      detailsToggle.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+      detailsToggle.style.color = "#fff";
+      detailsToggle.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+      detailsToggle.style.borderRadius = "6px";
+      detailsToggle.style.cursor = "pointer";
+      detailsToggle.style.fontSize = "12px";
+      detailsToggle.style.fontWeight = "500";
+      detailsToggle.style.transition = "background-color 0.2s ease";
+      const detailsDiv = document.createElement("div");
+      detailsDiv.style.marginTop = "8px";
+      detailsDiv.style.padding = "10px";
+      detailsDiv.style.backgroundColor = "rgba(0, 0, 0, 0.3)";
+      detailsDiv.style.borderRadius = "6px";
+      detailsDiv.style.fontSize = "12px";
+      detailsDiv.style.fontFamily = "monospace";
+      detailsDiv.style.maxHeight = "150px";
+      detailsDiv.style.overflowY = "auto";
+      detailsDiv.style.wordBreak = "break-word";
+      detailsDiv.style.display = "none";
+      detailsDiv.innerText = details;
+      detailsToggle.onclick = () => {
+        const isVisible = detailsDiv.style.display === "block";
+        detailsDiv.style.display = isVisible ? "none" : "block";
+        detailsToggle.innerText = isVisible ? "查看详情" : "隐藏详情";
+      };
+      detailsToggle.onmouseenter = () => {
+        detailsToggle.style.backgroundColor = "rgba(255, 255, 255, 0.3)";
+      };
+      detailsToggle.onmouseleave = () => {
+        detailsToggle.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+      };
+      errorDiv.appendChild(detailsToggle);
+      errorDiv.appendChild(detailsDiv);
+    }
+    const closeBtn = document.createElement("button");
+    closeBtn.innerText = "×";
+    closeBtn.style.position = "absolute";
+    closeBtn.style.top = "12px";
+    closeBtn.style.right = "12px";
+    closeBtn.style.width = "24px";
+    closeBtn.style.height = "24px";
+    closeBtn.style.borderRadius = "50%";
+    closeBtn.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+    closeBtn.style.color = "#fff";
+    closeBtn.style.border = "none";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.fontSize = "18px";
+    closeBtn.style.fontWeight = "bold";
+    closeBtn.style.display = "flex";
+    closeBtn.style.alignItems = "center";
+    closeBtn.style.justifyContent = "center";
+    closeBtn.style.transition = "background-color 0.2s ease";
+    closeBtn.onclick = () => {
+      errorDiv.style.animation = "slideUp 0.3s ease-out";
+      setTimeout(() => errorDiv.remove(), 300);
+    };
+    closeBtn.onmouseenter = () => {
+      closeBtn.style.backgroundColor = "rgba(255, 255, 255, 0.3)";
+    };
+    closeBtn.onmouseleave = () => {
+      closeBtn.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+    };
+    errorDiv.appendChild(closeBtn);
+    setTimeout(() => {
+      if (errorDiv.parentElement) {
+        errorDiv.style.animation = "slideUp 0.3s ease-out";
+        setTimeout(() => errorDiv.remove(), 300);
+      }
+    }, 1e4);
+    if (!document.getElementById("vtranslate-error-animations")) {
+      const style = document.createElement("style");
+      style.id = "vtranslate-error-animations";
+      style.textContent = `
+            @keyframes slideDown {
+                from {
+                    opacity: 0;
+                    transform: translateX(-50%) translateY(-20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(-50%) translateY(0);
+                }
+            }
+            @keyframes slideUp {
+                from {
+                    opacity: 1;
+                    transform: translateX(-50%) translateY(0);
+                }
+                to {
+                    opacity: 0;
+                    transform: translateX(-50%) translateY(-20px);
+                }
+            }
+        `;
+      document.head.appendChild(style);
+    }
+    return errorDiv;
   }
   function showDesktopReader(images) {
     let currentIndex = 0;
@@ -775,7 +1004,8 @@ ${context ? `
         translateBtn.innerText = "已翻译";
       } catch (e) {
         console.error(e);
-        alert("Translation failed. See console.");
+        const errorNotification = showErrorNotification(e);
+        document.body.appendChild(errorNotification);
         translateBtn.disabled = false;
         translateBtn.innerText = "重试";
         translateBtn.style.backgroundColor = "#f44336";
@@ -1109,7 +1339,8 @@ ${context ? `
         controlPanel.style.display = "flex";
       } catch (e) {
         console.error(e);
-        alert("Translation failed. See console.");
+        const errorNotification = showErrorNotification(e, imageContainer);
+        imageContainer.appendChild(errorNotification);
         translateBtn.disabled = false;
         translateBtn.innerText = "重试";
         translateBtn.style.backgroundColor = "#f44336";
