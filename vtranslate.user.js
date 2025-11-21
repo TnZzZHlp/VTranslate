@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       vtranslate
 // @namespace  npm/vite-plugin-monkey
-// @version    1.0.0
+// @version    1.1.0
 // @icon       https://vitejs.dev/logo.svg
 // @match      https://bbs.yamibo.com/thread-*
 // @match      https://bbs.yamibo.com/forum.php*
@@ -44,6 +44,163 @@
       return false;
     }
   });
+  function injectStyles() {
+    if (document.getElementById("vtranslate-styles")) return;
+    const style = document.createElement("style");
+    style.id = "vtranslate-styles";
+    style.textContent = `
+        /* Global Overlay */
+        .vtranslate-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Translation Modal */
+        .vtranslate-modal {
+            display: flex;
+            width: 90%;
+            height: 80%;
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            font-family: system-ui, -apple-system, sans-serif;
+            flex-direction: row;
+        }
+
+        .vtranslate-image-container {
+            flex: 1;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .vtranslate-text-container {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            color: #e0e0e0;
+            font-size: 16px;
+            line-height: 1.6;
+            background-color: #1e1e1e;
+            position: relative;
+        }
+
+        /* Settings Panel */
+        .vtranslate-settings-panel {
+            width: 400px;
+            max-width: 90%;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            color: #fff;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        /* Reader Mode */
+        .vtranslate-reader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            z-index: 10002;
+            display: flex;
+            flex-direction: row;
+        }
+
+        .vtranslate-reader-panel {
+            flex: 1;
+            min-width: 150px;
+            height: 100%;
+            background-color: #1a1a1a;
+            position: relative;
+            overflow-y: auto;
+            border-color: #333;
+            border-style: solid;
+        }
+        .vtranslate-reader-panel-left { border-right-width: 1px; }
+        .vtranslate-reader-panel-right { border-left-width: 1px; }
+
+        .vtranslate-reader-center {
+            flex: 0 0 auto;
+            max-width: 60%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        /* Mobile Adaptations */
+        @media (max-width: 768px) {
+            /* Translation Modal */
+            .vtranslate-modal {
+                flex-direction: column;
+                height: 90%;
+            }
+            .vtranslate-image-container {
+                flex: 0 0 40%;
+                padding: 10px;
+            }
+            .vtranslate-text-container {
+                flex: 1;
+                padding: 20px;
+            }
+
+            /* Reader Mode */
+            .vtranslate-reader-overlay {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+            .vtranslate-reader-center {
+                order: 1;
+                max-width: 100%;
+                width: 100% !important;
+                flex: none;
+                height: auto;
+                max-height: 60%;
+            }
+            .vtranslate-reader-panel {
+                order: 2;
+                min-width: 0;
+                width: 100%;
+                height: auto;
+                flex: none;
+                overflow-y: visible;
+                border: none;
+                border-top: 1px solid #333;
+            }
+            .vtranslate-reader-panel-left { order: 2; }
+            .vtranslate-reader-panel-right { order: 3; }
+
+            .vtranslate-text-block {
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+                width: 100% !important;
+                margin-bottom: 10px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+  }
   function createFloatingButton(iconSvg, onClick, bottomOffset = "20px") {
     const button = document.createElement("div");
     button.innerHTML = iconSvg;
@@ -134,9 +291,18 @@
       return container;
     };
     panel.appendChild(createField("API Key", "apiKey", "password", "sk-..."));
-    panel.appendChild(createField("API Endpoint", "endpoint", "text", "https://api.openai.com/v1/chat/completions"));
+    panel.appendChild(
+      createField(
+        "API Endpoint",
+        "endpoint",
+        "text",
+        "https://api.openai.com/v1/chat/completions"
+      )
+    );
     panel.appendChild(createField("Model", "model", "text", "gpt-4o"));
-    panel.appendChild(createField("Temperature", "temperature", "number", "0.7"));
+    panel.appendChild(
+      createField("Temperature", "temperature", "number", "0.7")
+    );
     const btnContainer = document.createElement("div");
     btnContainer.style.display = "flex";
     btnContainer.style.justifyContent = "flex-end";
@@ -330,32 +496,9 @@ ${context ? `
       }
     });
   }
-  function extractImages() {
-    const images = Array.from(document.querySelectorAll("ignore_js_op img"));
-    console.debug("[Reader] Extracted images:", images);
-    const uniqueSrcs = new Set();
-    const validImages = [];
-    images.forEach((img) => {
-      const src = img.getAttribute("file") || img.src;
-      if (!src || uniqueSrcs.has(src)) {
-        return;
-      }
-      uniqueSrcs.add(src);
-      validImages.push({
-        src,
-        originalElement: img
-      });
-    });
-    return validImages;
-  }
-  function showReaderMode() {
-    if (document.getElementById("vtranslate-reader")) return;
-    const images = extractImages();
-    if (images.length === 0) {
-      alert("No suitable images found for Reader Mode.");
-      return;
-    }
+  function showDesktopReader(images) {
     let currentIndex = 0;
+    injectStyles();
     const overlay = document.createElement("div");
     overlay.id = "vtranslate-reader";
     overlay.style.position = "fixed";
@@ -590,8 +733,13 @@ ${context ? `
           const textBlock = document.createElement("div");
           textBlock.innerText = block.text;
           textBlock.style.position = "absolute";
-          textBlock.style.width = "90%";
-          textBlock.style.left = "5%";
+          textBlock.style.width = "fit-content";
+          textBlock.style.maxWidth = "90%";
+          if (align === "right") {
+            textBlock.style.right = "5%";
+          } else {
+            textBlock.style.left = "5%";
+          }
           textBlock.style.backgroundColor = "rgba(30, 30, 30, 0.9)";
           textBlock.style.color = "#fff";
           textBlock.style.padding = "10px 12px";
@@ -691,7 +839,6 @@ ${context ? `
         updateView();
       }
     };
-    translateBtn.onclick = doTranslate;
     const handleKeydown = (e) => {
       if (e.key === "ArrowLeft") prevBtn.click();
       if (e.key === "ArrowRight") nextBtn.click();
@@ -724,6 +871,331 @@ ${context ? `
       document.body.removeChild(overlay);
     };
     updateView();
+  }
+  function showMobileReader(images) {
+    let currentIndex = 0;
+    injectStyles();
+    const overlay = document.createElement("div");
+    overlay.id = "vtranslate-reader";
+    overlay.style.position = "fixed";
+    overlay.style.top = "0";
+    overlay.style.left = "0";
+    overlay.style.width = "100vw";
+    overlay.style.height = "100vh";
+    overlay.style.backgroundColor = "#000";
+    overlay.style.zIndex = "10002";
+    overlay.style.display = "flex";
+    overlay.style.flexDirection = "column";
+    const translationsContainer = document.createElement("div");
+    translationsContainer.style.position = "absolute";
+    translationsContainer.style.bottom = "0";
+    translationsContainer.style.left = "0";
+    translationsContainer.style.width = "100%";
+    translationsContainer.style.maxHeight = "60%";
+    translationsContainer.style.zIndex = "10";
+    translationsContainer.style.display = "none";
+    translationsContainer.style.overflowY = "auto";
+    translationsContainer.style.padding = "16px";
+    translationsContainer.style.boxSizing = "border-box";
+    translationsContainer.style.backgroundColor = "rgba(0, 0, 0, 0.95)";
+    translationsContainer.style.backdropFilter = "blur(10px)";
+    translationsContainer.style.borderTop = "1px solid rgba(255, 255, 255, 0.1)";
+    translationsContainer.style.transition = "transform 0.3s ease-out";
+    translationsContainer.style.borderRadius = "16px 16px 0 0";
+    translationsContainer.style.boxShadow = "0 -4px 20px rgba(0, 0, 0, 0.5)";
+    const imageContainer = document.createElement("div");
+    imageContainer.style.flex = "1";
+    imageContainer.style.width = "100%";
+    imageContainer.style.maxWidth = "100%";
+    imageContainer.style.height = "100%";
+    imageContainer.style.display = "flex";
+    imageContainer.style.justifyContent = "center";
+    imageContainer.style.alignItems = "center";
+    imageContainer.style.position = "relative";
+    imageContainer.style.backgroundColor = "#000";
+    const mainImage = document.createElement("img");
+    mainImage.style.maxHeight = "100%";
+    mainImage.style.maxWidth = "100%";
+    mainImage.style.objectFit = "contain";
+    mainImage.style.display = "block";
+    mainImage.style.transition = "opacity 0.2s ease";
+    mainImage.onload = () => {
+      imageContainer.style.width = "100%";
+    };
+    imageContainer.appendChild(mainImage);
+    imageContainer.appendChild(translationsContainer);
+    const createNavButton = (text, right) => {
+      const btn = document.createElement("button");
+      btn.innerText = text;
+      btn.style.position = "absolute";
+      btn.style.top = "50%";
+      btn.style.transform = "translateY(-50%)";
+      btn.style.width = "50px";
+      btn.style.height = "50px";
+      btn.style.borderRadius = "50%";
+      btn.style.backgroundColor = "rgba(0, 0, 0, 0.3)";
+      btn.style.backdropFilter = "blur(4px)";
+      btn.style.color = "#fff";
+      btn.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+      btn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
+      btn.style.cursor = "pointer";
+      btn.style.fontSize = "20px";
+      btn.style.zIndex = "100";
+      btn.style.display = "flex";
+      btn.style.justifyContent = "center";
+      btn.style.alignItems = "center";
+      btn.style.transition = "all 0.2s ease, opacity 0.3s ease";
+      if (right) btn.style.right = "20px";
+      else btn.style.left = "20px";
+      btn.style.opacity = "0";
+      btn.style.pointerEvents = "none";
+      return btn;
+    };
+    imageContainer.style.overflow = "hidden";
+    const prevBtn = createNavButton("❮", false);
+    const nextBtn = createNavButton("❯", true);
+    imageContainer.appendChild(prevBtn);
+    imageContainer.appendChild(nextBtn);
+    const controlPanel = document.createElement("div");
+    controlPanel.style.position = "absolute";
+    controlPanel.style.top = "0";
+    controlPanel.style.left = "50%";
+    controlPanel.style.transform = "translate(-50%, 0)";
+    controlPanel.style.display = "none";
+    controlPanel.style.gap = "16px";
+    controlPanel.style.zIndex = "100";
+    controlPanel.style.padding = "20px 30px 10px 30px";
+    controlPanel.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+    controlPanel.style.borderRadius = "0 0 20px 20px";
+    controlPanel.style.backdropFilter = "blur(8px)";
+    controlPanel.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+    controlPanel.style.borderTop = "none";
+    controlPanel.style.transition = "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
+    const translateBtn = document.createElement("button");
+    translateBtn.innerText = "翻译当前";
+    translateBtn.style.padding = "10px 24px";
+    translateBtn.style.backgroundColor = "#4CAF50";
+    translateBtn.style.backgroundImage = "linear-gradient(45deg, #4CAF50, #45a049)";
+    translateBtn.style.color = "white";
+    translateBtn.style.border = "none";
+    translateBtn.style.borderRadius = "20px";
+    translateBtn.style.cursor = "pointer";
+    translateBtn.style.fontSize = "14px";
+    translateBtn.style.fontWeight = "600";
+    translateBtn.style.letterSpacing = "0.5px";
+    translateBtn.style.whiteSpace = "nowrap";
+    translateBtn.style.boxShadow = "0 4px 12px rgba(76, 175, 80, 0.3)";
+    controlPanel.appendChild(translateBtn);
+    const closeBtn = document.createElement("button");
+    closeBtn.innerText = "关闭";
+    closeBtn.style.padding = "10px 24px";
+    closeBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+    closeBtn.style.color = "white";
+    closeBtn.style.border = "1px solid rgba(255, 255, 255, 0.2)";
+    closeBtn.style.borderRadius = "20px";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.fontSize = "14px";
+    closeBtn.style.fontWeight = "600";
+    closeBtn.style.whiteSpace = "nowrap";
+    controlPanel.appendChild(closeBtn);
+    imageContainer.appendChild(controlPanel);
+    overlay.appendChild(imageContainer);
+    document.body.appendChild(overlay);
+    const updateView = () => {
+      const imgData = images[currentIndex];
+      mainImage.src = imgData.src;
+      prevBtn.style.opacity = currentIndex > 0 ? "1" : "0";
+      prevBtn.style.pointerEvents = currentIndex > 0 ? "auto" : "none";
+      nextBtn.style.opacity = currentIndex < images.length - 1 ? "1" : "0";
+      nextBtn.style.pointerEvents = currentIndex < images.length - 1 ? "auto" : "none";
+      translationsContainer.innerHTML = "";
+      const cachedResult = getCachedTranslation(imgData.src);
+      if (cachedResult) {
+        renderTranslations(cachedResult);
+        translateBtn.innerText = "已翻译";
+        translateBtn.style.backgroundColor = "#888";
+      } else {
+        translateBtn.innerText = "翻译当前";
+        translateBtn.style.backgroundColor = "#4CAF50";
+        translateBtn.disabled = false;
+      }
+    };
+    const renderTranslations = (result) => {
+      translationsContainer.innerHTML = "";
+      const dragHandle = document.createElement("div");
+      dragHandle.style.width = "40px";
+      dragHandle.style.height = "4px";
+      dragHandle.style.backgroundColor = "rgba(255, 255, 255, 0.3)";
+      dragHandle.style.borderRadius = "2px";
+      dragHandle.style.margin = "0 auto 16px auto";
+      translationsContainer.appendChild(dragHandle);
+      const leftBlocks = result.blocks.filter((b) => b.side === "left");
+      const rightBlocks = result.blocks.filter((b) => b.side !== "left");
+      const sortedLeftBlocks = [...leftBlocks].sort((a, b) => a.y - b.y);
+      const sortedRightBlocks = [...rightBlocks].sort((a, b) => a.y - b.y);
+      const allBlocks = [...sortedLeftBlocks, ...sortedRightBlocks];
+      sortedLeftBlocks.forEach((block) => {
+        const textBlock = document.createElement("div");
+        textBlock.innerText = block.text;
+        textBlock.style.width = "fit-content";
+        textBlock.style.maxWidth = "90%";
+        textBlock.style.marginBottom = "12px";
+        textBlock.style.marginLeft = "0";
+        textBlock.style.marginRight = "auto";
+        textBlock.style.backgroundColor = "rgba(40, 40, 40, 0.8)";
+        textBlock.style.color = "#fff";
+        textBlock.style.padding = "12px 14px";
+        textBlock.style.borderRadius = "8px";
+        textBlock.style.fontSize = "15px";
+        textBlock.style.lineHeight = "1.6";
+        textBlock.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.2)";
+        textBlock.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+        textBlock.style.borderLeft = "3px solid rgba(76, 175, 80, 0.6)";
+        textBlock.style.wordWrap = "break-word";
+        textBlock.style.textAlign = "left";
+        textBlock.style.transition = "background-color 0.2s ease";
+        textBlock.style.opacity = "0";
+        textBlock.style.transform = "translateX(-10px)";
+        translationsContainer.appendChild(textBlock);
+        const index = allBlocks.indexOf(block);
+        setTimeout(() => {
+          textBlock.style.transition = "opacity 0.3s ease, transform 0.3s ease, background-color 0.2s ease";
+          textBlock.style.opacity = "1";
+          textBlock.style.transform = "translateX(0)";
+        }, index * 50);
+      });
+      sortedRightBlocks.forEach((block) => {
+        const textBlock = document.createElement("div");
+        textBlock.innerText = block.text;
+        textBlock.style.width = "fit-content";
+        textBlock.style.maxWidth = "90%";
+        textBlock.style.marginBottom = "12px";
+        textBlock.style.marginLeft = "auto";
+        textBlock.style.marginRight = "0";
+        textBlock.style.backgroundColor = "rgba(40, 40, 40, 0.8)";
+        textBlock.style.color = "#fff";
+        textBlock.style.padding = "12px 14px";
+        textBlock.style.borderRadius = "8px";
+        textBlock.style.fontSize = "15px";
+        textBlock.style.lineHeight = "1.6";
+        textBlock.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.2)";
+        textBlock.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+        textBlock.style.borderRight = "3px solid rgba(33, 150, 243, 0.6)";
+        textBlock.style.wordWrap = "break-word";
+        textBlock.style.textAlign = "right";
+        textBlock.style.transition = "background-color 0.2s ease";
+        textBlock.style.opacity = "0";
+        textBlock.style.transform = "translateX(10px)";
+        translationsContainer.appendChild(textBlock);
+        const index = allBlocks.indexOf(block);
+        setTimeout(() => {
+          textBlock.style.transition = "opacity 0.3s ease, transform 0.3s ease, background-color 0.2s ease";
+          textBlock.style.opacity = "1";
+          textBlock.style.transform = "translateX(0)";
+        }, index * 50);
+      });
+    };
+    const doTranslate = async () => {
+      const imgData = images[currentIndex];
+      if (getCachedTranslation(imgData.src)) return;
+      translateBtn.disabled = true;
+      translateBtn.innerText = "翻译中...";
+      translateBtn.style.backgroundColor = "#888";
+      try {
+        const result = await fetchTranslation(imgData.originalElement);
+        renderTranslations(result);
+        translateBtn.innerText = "已翻译";
+        translationsContainer.style.display = "block";
+        controlPanel.style.display = "flex";
+      } catch (e) {
+        console.error(e);
+        alert("Translation failed. See console.");
+        translateBtn.disabled = false;
+        translateBtn.innerText = "重试";
+        translateBtn.style.backgroundColor = "#f44336";
+      }
+    };
+    translateBtn.onclick = doTranslate;
+    prevBtn.onclick = () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        updateView();
+      }
+    };
+    nextBtn.onclick = () => {
+      if (currentIndex < images.length - 1) {
+        currentIndex++;
+        updateView();
+      }
+    };
+    mainImage.onclick = () => {
+      if (translateBtn.innerText === "翻译当前" && !translateBtn.disabled) {
+        doTranslate();
+        return;
+      }
+      const isVisible = translationsContainer.style.display === "block";
+      if (isVisible) {
+        translationsContainer.style.opacity = "0";
+        translationsContainer.style.transform = "translateY(20px)";
+        setTimeout(() => {
+          translationsContainer.style.display = "none";
+          controlPanel.style.display = "none";
+        }, 300);
+      } else {
+        translationsContainer.style.display = "block";
+        translationsContainer.style.opacity = "0";
+        translationsContainer.style.transform = "translateY(20px)";
+        controlPanel.style.display = "flex";
+        setTimeout(() => {
+          translationsContainer.style.transition = "opacity 0.3s ease, transform 0.3s ease";
+          translationsContainer.style.opacity = "1";
+          translationsContainer.style.transform = "translateY(0)";
+        }, 10);
+      }
+    };
+    closeBtn.onclick = () => {
+      document.body.removeChild(overlay);
+    };
+    updateView();
+  }
+  function extractImages() {
+    let images = Array.from(
+      document.querySelectorAll("ignore_js_op img")
+    );
+    if (images.length === 0) {
+      images = Array.from(
+        document.querySelectorAll(".message a img")
+      );
+    }
+    console.debug("[Reader] Extracted images:", images);
+    const uniqueSrcs = new Set();
+    const validImages = [];
+    images.forEach((img) => {
+      const src = img.getAttribute("file") || img.src;
+      if (!src || uniqueSrcs.has(src)) {
+        return;
+      }
+      uniqueSrcs.add(src);
+      validImages.push({
+        src,
+        originalElement: img
+      });
+    });
+    return validImages;
+  }
+  function showReaderMode() {
+    if (document.getElementById("vtranslate-reader")) return;
+    const images = extractImages();
+    if (images.length === 0) {
+      alert("No suitable images found for Reader Mode.");
+      return;
+    }
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      showMobileReader(images);
+    } else {
+      showDesktopReader(images);
+    }
   }
   function addReaderButton() {
     const icon = `
